@@ -1,0 +1,98 @@
+﻿<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<test-results xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="nunit_schema_2.5.xsd" name="Pester" total="29" errors="0" failures="0" not-run="0" inconclusive="0" ignored="0" skipped="0" invalid="0" date="2025-03-29" time="01:34:39">
+  <environment os-version="10.0.22631" user-domain="SYSTEKLENO" user="sysTekAdmin" clr-version="9.0.1" cwd="E:\OSDCloudCustomBuilder" machine-name="SYSTEKLENO" nunit-version="2.5.8.0" platform="Microsoft Windows 11 Enterprise|C:\WINDOWS|\Device\Harddisk0\Partition3" />
+  <culture-info current-culture="en-US" current-uiculture="en-US" />
+  <test-suite type="TestFixture" name="Pester" executed="True" result="Success" success="True" time="6.0582" asserts="0" description="Pester">
+    <results>
+      <test-suite type="TestFixture" name="E:\OSDCloudCustomBuilder\Tests\Add-CustomWimWithPwsh7.Tests.ps1" executed="True" result="Success" success="True" time="2.4806" asserts="0" description="E:\OSDCloudCustomBuilder\Tests\Add-CustomWimWithPwsh7.Tests.ps1">
+        <results>
+          <test-suite type="TestFixture" name="Add-CustomWimWithPwsh7" executed="True" result="Success" success="True" time="1.7417" asserts="0" description="Add-CustomWimWithPwsh7">
+            <results>
+              <test-case description="Calls all required functions with basic parameters" name="Add-CustomWimWithPwsh7.Calls all required functions with basic parameters" time="1.1078" asserts="0" success="True" result="Success" executed="True" />
+              <test-case description="Skips cleanup when SkipCleanup is specified" name="Add-CustomWimWithPwsh7.Skips cleanup when SkipCleanup is specified" time="0.2605" asserts="0" success="True" result="Success" executed="True" />
+              <test-case description="Passes IncludeWinRE parameter to New-CustomISO" name="Add-CustomWimWithPwsh7.Passes IncludeWinRE parameter to New-CustomISO" time="0.301" asserts="0" success="True" result="Success" executed="True" />
+            </results>
+          </test-suite>
+        </results>
+      </test-suite>
+      <test-suite type="TestFixture" name="E:\OSDCloudCustomBuilder\Tests\Copy-WimFileEfficiently.Tests.ps1" executed="True" result="Success" success="True" time="0.8137" asserts="0" description="E:\OSDCloudCustomBuilder\Tests\Copy-WimFileEfficiently.Tests.ps1">
+        <results>
+          <test-suite type="TestFixture" name="Copy-WimFileEfficiently" executed="True" result="Success" success="True" time="0.6447" asserts="0" description="Copy-WimFileEfficiently">
+            <results>
+              <test-case description="Creates the destination directory if it doesn't exist" name="Copy-WimFileEfficiently.Creates the destination directory if it doesn't exist" time="0.1242" asserts="0" success="True" result="Success" executed="True" />
+              <test-case description="Calls robocopy with the correct parameters" name="Copy-WimFileEfficiently.Calls robocopy with the correct parameters" time="0.0486" asserts="0" success="True" result="Success" executed="True" />
+              <test-case description="Renames the file when NewName is provided" name="Copy-WimFileEfficiently.Renames the file when NewName is provided" time="0.0674" asserts="0" success="True" result="Success" executed="True" />
+              <test-case description="Returns true when robocopy is successful" name="Copy-WimFileEfficiently.Returns true when robocopy is successful" time="0.0444" asserts="0" success="True" result="Success" executed="True" />
+              <test-case description="Returns false when robocopy fails" name="Copy-WimFileEfficiently.Returns false when robocopy fails" time="0.2676" asserts="0" success="True" result="Success" executed="True" />
+            </results>
+          </test-suite>
+        </results>
+      </test-suite>
+      <test-suite type="TestFixture" name="E:\OSDCloudCustomBuilder\Tests\Initialize-BuildEnvironment.Tests.ps1" executed="True" result="Success" success="True" time="0.5973" asserts="0" description="E:\OSDCloudCustomBuilder\Tests\Initialize-BuildEnvironment.Tests.ps1">
+        <results>
+          <test-suite type="TestFixture" name="Initialize-BuildEnvironment Function Tests" executed="True" result="Success" success="True" time="0.5162" asserts="0" description="Initialize-BuildEnvironment Function Tests">
+            <results>
+              <test-case description="Should create output directory if it doesn't exist" name="Initialize-BuildEnvironment Function Tests.Should create output directory if it doesn't exist" time="0.1629" asserts="0" success="True" result="Success" executed="True" />
+              <test-case description="Should install OSD module if not present" name="Initialize-BuildEnvironment Function Tests.Should install OSD module if not present" time="0.1343" asserts="0" success="True" result="Success" executed="True" />
+              <test-case description="Should not install OSD module if already present" name="Initialize-BuildEnvironment Function Tests.Should not install OSD module if already present" time="0.0809" asserts="0" success="True" result="Success" executed="True" />
+              <test-case description="Should throw an error if ADK is not installed" name="Initialize-BuildEnvironment Function Tests.Should throw an error if ADK is not installed" time="0.0712" asserts="0" success="True" result="Success" executed="True" />
+            </results>
+          </test-suite>
+        </results>
+      </test-suite>
+      <test-suite type="TestFixture" name="E:\OSDCloudCustomBuilder\Tests\OSDCloudCustomBuilder.Tests.ps1" executed="True" result="Success" success="True" time="1.0721" asserts="0" description="E:\OSDCloudCustomBuilder\Tests\OSDCloudCustomBuilder.Tests.ps1">
+        <results>
+          <test-suite type="TestFixture" name="OSDCloudCustomBuilder Module Tests" executed="True" result="Success" success="True" time="0.8896" asserts="0" description="OSDCloudCustomBuilder Module Tests">
+            <results>
+              <test-suite type="TestFixture" name="OSDCloudCustomBuilder Module Tests.Module Functions" executed="True" result="Success" success="True" time="0.0611" asserts="0" description="OSDCloudCustomBuilder Module Tests.Module Functions">
+                <results>
+                  <test-case description="Should be able to access the Add-CustomWimWithPwsh7 function" name="OSDCloudCustomBuilder Module Tests.Module Functions.Should be able to access the Add-CustomWimWithPwsh7 function" time="0.0418" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="Should be able to access the New-CustomOSDCloudISO function" name="OSDCloudCustomBuilder Module Tests.Module Functions.Should be able to access the New-CustomOSDCloudISO function" time="0.0105" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="OSDCloudCustomBuilder Module Tests.Add-CustomWimWithPwsh7 Function" executed="True" result="Success" success="True" time="0.5297" asserts="0" description="OSDCloudCustomBuilder Module Tests.Add-CustomWimWithPwsh7 Function">
+                <results>
+                  <test-case description="Should run without errors with minimum parameters" name="OSDCloudCustomBuilder Module Tests.Add-CustomWimWithPwsh7 Function.Should run without errors with minimum parameters" time="0.0465" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="Should run without errors with all parameters" name="OSDCloudCustomBuilder Module Tests.Add-CustomWimWithPwsh7 Function.Should run without errors with all parameters" time="0.025" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="Should call all required internal functions" name="OSDCloudCustomBuilder Module Tests.Add-CustomWimWithPwsh7 Function.Should call all required internal functions" time="0.2264" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="Should not call Remove-TempFiles when SkipCleanup is specified" name="OSDCloudCustomBuilder Module Tests.Add-CustomWimWithPwsh7 Function.Should not call Remove-TempFiles when SkipCleanup is specified" time="0.1618" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="OSDCloudCustomBuilder Module Tests.Copy-WimFileEfficiently Function" executed="True" result="Success" success="True" time="0.8694" asserts="0" description="OSDCloudCustomBuilder Module Tests.Copy-WimFileEfficiently Function">
+                <results>
+                  <test-case description="Should handle successful file copy" name="OSDCloudCustomBuilder Module Tests.Copy-WimFileEfficiently Function.Should handle successful file copy" time="0.0614" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="Should handle renaming copied files" name="OSDCloudCustomBuilder Module Tests.Copy-WimFileEfficiently Function.Should handle renaming copied files" time="0.1191" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="Should report failure when robocopy fails" name="OSDCloudCustomBuilder Module Tests.Copy-WimFileEfficiently Function.Should report failure when robocopy fails" time="0.0787" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+            </results>
+          </test-suite>
+        </results>
+      </test-suite>
+      <test-suite type="TestFixture" name="E:\OSDCloudCustomBuilder\Tests\Show-Summary.Tests.ps1" executed="True" result="Success" success="True" time="0.7019" asserts="0" description="E:\OSDCloudCustomBuilder\Tests\Show-Summary.Tests.ps1">
+        <results>
+          <test-suite type="TestFixture" name="Show-Summary" executed="True" result="Success" success="True" time="0.6349" asserts="0" description="Show-Summary">
+            <results>
+              <test-case description="Calls Get-WindowsImage with the correct parameters" name="Show-Summary.Calls Get-WindowsImage with the correct parameters" time="0.1133" asserts="0" success="True" result="Success" executed="True" />
+              <test-case description="Calls Get-Item with the correct parameters" name="Show-Summary.Calls Get-Item with the correct parameters" time="0.1133" asserts="0" success="True" result="Success" executed="True" />
+              <test-case description="Displays WinRE information when IncludeWinRE is specified" name="Show-Summary.Displays WinRE information when IncludeWinRE is specified" time="0.1223" asserts="0" success="True" result="Success" executed="True" />
+              <test-case description="Does not display WinRE information when IncludeWinRE is not specified" name="Show-Summary.Does not display WinRE information when IncludeWinRE is not specified" time="0.0874" asserts="0" success="True" result="Success" executed="True" />
+            </results>
+          </test-suite>
+        </results>
+      </test-suite>
+      <test-suite type="TestFixture" name="E:\OSDCloudCustomBuilder\Tests\Test-WimFile.Tests.ps1" executed="True" result="Success" success="True" time="0.3278" asserts="0" description="E:\OSDCloudCustomBuilder\Tests\Test-WimFile.Tests.ps1">
+        <results>
+          <test-suite type="TestFixture" name="Test-WimFile" executed="True" result="Success" success="True" time="0.2571" asserts="0" description="Test-WimFile">
+            <results>
+              <test-case description="Throws an error when the WIM file doesn't exist" name="Test-WimFile.Throws an error when the WIM file doesn't exist" time="0.0402" asserts="0" success="True" result="Success" executed="True" />
+              <test-case description="Returns WIM information for a valid WIM file" name="Test-WimFile.Returns WIM information for a valid WIM file" time="0.0549" asserts="0" success="True" result="Success" executed="True" />
+              <test-case description="Throws an error when the file is not a valid WIM" name="Test-WimFile.Throws an error when the file is not a valid WIM" time="0.0393" asserts="0" success="True" result="Success" executed="True" />
+              <test-case description="Calls Get-WindowsImage with the correct parameters" name="Test-WimFile.Calls Get-WindowsImage with the correct parameters" time="0.0581" asserts="0" success="True" result="Success" executed="True" />
+            </results>
+          </test-suite>
+        </results>
+      </test-suite>
+    </results>
+  </test-suite>
+</test-results>

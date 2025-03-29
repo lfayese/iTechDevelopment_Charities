@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<unattend xmlns="urn:schemas-microsoft-com:unattend">
+    <settings pass="auditUser">
+        <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+            <Reseal>
+                <Mode>OOBE</Mode>
+            </Reseal>
+        </component>
+    </settings>
+    <settings pass="oobeSystem">
+	<component name="Microsoft-Windows-International-Core" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+            <InputLocale>0409:00000409</InputLocale>
+            <SystemLocale>en-US</SystemLocale>
+            <UILanguage>en-US</UILanguage>
+            <UILanguageFallback>en-US</UILanguageFallback>
+            <UserLocale>en-US</UserLocale>
+        </component>
+        <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+            <TimeZone>Eastern Standard Time</TimeZone>
+            <OOBE>
+                <HideEULAPage>true</HideEULAPage>
+                <HideLocalAccountScreen>true</HideLocalAccountScreen>
+                <HideOnlineAccountScreens>false</HideOnlineAccountScreens>
+                <HideWirelessSetupInOOBE>false</HideWirelessSetupInOOBE>
+                <NetworkLocation>Work</NetworkLocation>
+                <ProtectYourPC>1</ProtectYourPC>
+                <SkipMachineOOBE>false</SkipMachineOOBE>
+                <SkipUserOOBE>false</SkipUserOOBE>
+                <HideOEMRegistrationScreen>true</HideOEMRegistrationScreen>
+                <UnattendEnableRetailDemo>false</UnattendEnableRetailDemo>
+            </OOBE>
+            <FirstLogonCommands>
+		<SynchronousCommand wcm:action="add">
+                    <Order>1</Order>
+                    <CommandLine>Start-Process PowerShell -ArgumentList "-NoL -C Install-Module OSD -Force -Verbose" -Wait</CommandLine>
+                    <Description>Installing OSD PS Module</Description>
+                </SynchronousCommand>			
+		<SynchronousCommand wcm:action="add">
+                    <Order>2</Order>
+                    <CommandLine>Start-Process PowerShell -ArgumentList "-NoL -C Import-Module OSD -Force -Verbose" -Wait</CommandLine>
+                    <Description>Import OSD PS Module</Description>
+                </SynchronousCommand>
+		<SynchronousCommand wcm:action="add">
+                    <Order>3</Order>
+                    <CommandLine>Start-Process PowerShell -ArgumentList "-NoL -C &amp; 'C:\OSDCloud\Scripts\check-autopilotprereq.ps1'" -Wait</CommandLine>
+                    <Description>Check Windows Autopilot Registration prerequisites</Description>
+                </SynchronousCommand>
+                <SynchronousCommand wcm:action="add">
+                    <Order>4</Order>
+                    <CommandLine>Start-Process PowerShell -ArgumentList "-NoL -C &amp; 'C:\OSDCloud\Scripts\SendKeysRegisterWinApilot.ps1'" -Wait</CommandLine>
+                    <Description>Executing Windows Autopilot Registration Script...</Description>
+                </SynchronousCommand>
+                <SynchronousCommand wcm:action="add">
+                    <Order>5</Order>
+                    <CommandLine>Start-Process PowerShell -ArgumentList "-NoL -C &amp; 'C:\OSDCloud\Scripts\RegisterTask.ps1'" -Wait</CommandLine>
+                    <Description>Register WaitForOnBoarding Task</Description>
+                </SynchronousCommand>
+                <SynchronousCommand wcm:action="add">
+                    <Order>6</Order>
+                    <CommandLine>Start-Process PowerShell -ArgumentList "-NoL -C Invoke-Expression (Invoke-RestMethod -Uri 'https://WebHookNotify.ps1')" -Wait</CommandLine>
+                    <Description>Setup Complete Send Notification</Description>
+                </SynchronousCommand>
+            </FirstLogonCommands>
+	    <DoNotCleanTaskBar>true</DoNotCleanTaskBar>
+            <RegisteredOrganization></RegisteredOrganization>
+            <ConfigureChatAutoInstall>false</ConfigureChatAutoInstall>
+            <ShowPowerButtonOnStartScreen>true</ShowPowerButtonOnStartScreen>
+        </component>
+    </settings>
+</unattend>
