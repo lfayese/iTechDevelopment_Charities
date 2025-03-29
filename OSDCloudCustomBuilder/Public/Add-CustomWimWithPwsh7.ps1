@@ -28,52 +28,82 @@
 #>
 function Add-CustomWimWithPwsh7 {
     [CmdletBinding()]
-    param(
-        [Parameter(Mandatory=$true)]
+    param (
+        [Parameter(Mandatory = $true)]
+        [ValidateScript({Test-Path $_ -PathType Leaf})]
         [string]$WimPath,
         
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory = $true)]
         [string]$OutputPath,
         
-        [Parameter(Mandatory=$false)]
-        [string]$ISOFileName = "OSDCloudCustomWIM.iso",
+        [Parameter(Mandatory = $false)]
+        [string]$TempPath = "$env:TEMP\OSDCloudCustomBuilder",
         
-        [Parameter(Mandatory=$false)]
-        [string]$PowerShell7Url = "https://github.com/PowerShell/PowerShell/releases/download/v7.5.0/PowerShell-7.5.0-win-x64.zip",
+        [Parameter(Mandatory = $false)]
+        [string]$PowerShellVersion = "7.3.4",
         
-        [Parameter(Mandatory=$false)]
-        [switch]$IncludeWinRE,
-        
-        [Parameter(Mandatory=$false)]
-        [switch]$SkipCleanup,
-        
-        [Parameter(Mandatory=$false)]
-        [switch]$SkipAdminCheck
+        [Parameter(Mandatory = $false)]
+        [switch]$IncludeWinRE
     )
     
-    if (-not $SkipAdminCheck) {
-        # Check for administrator privileges
-        $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-        if (-not $isAdmin) {
-            throw "This function requires administrator privileges to run."
+    try {
+        # Create a proper workspace path
+        $workspacePath = Join-Path -Path $TempPath -ChildPath "Workspace"
+        
+        # Create the workspace directory if it doesn't exist
+        if (-not (Test-Path -Path $workspacePath)) {
+            New-Item -Path $workspacePath -ItemType Directory -Force | Out-Null
         }
+        
+        # Get the script path
+        $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
+        if (-not $scriptPath) {
+            $scriptPath = $PSScriptRoot
+            if (-not $scriptPath) {
+                throw "Unable to determine script path"
+            }
+        }
+        
+        # Create a temporary workspace
+        $tempWorkspacePath = Join-Path -Path $TempPath -ChildPath "TempWorkspace"
+        if (-not (Test-Path -Path $tempWorkspacePath)) {
+            New-Item -Path $tempWorkspacePath -ItemType Directory -Force | Out-Null
+        }
+        
+        # Ensure the output directory exists
+        $outputDirectory = Split-Path -Path $OutputPath -Parent
+        if (-not (Test-Path -Path $outputDirectory)) {
+            New-Item -Path $outputDirectory -ItemType Directory -Force | Out-Null
+        }
+        
+        # Copy the WIM file to the workspace
+        Write-Host "Copying custom WIM to workspace..." -ForegroundColor Cyan
+        Copy-CustomWimToWorkspace -WimPath $WimPath -WorkspacePath $workspacePath -ScriptPath $scriptPath
+        
+        # Customize WinPE with PowerShell 7
+        Write-Host "Adding PowerShell 7 support to WinPE..." -ForegroundColor Cyan
+        Customize-WinPEWithPowerShell7 -TempPath $tempWorkspacePath -WorkspacePath $workspacePath -PowerShellVersion $PowerShellVersion
+        
+        # Optimize ISO size
+        Write-Host "Optimizing ISO size..." -ForegroundColor Cyan
+        Optimize-ISOSize -WorkspacePath $workspacePath
+        
+        # Create the ISO
+        Write-Host "Creating custom ISO..." -ForegroundColor Cyan
+        New-CustomISO -WorkspacePath $workspacePath -OutputPath $OutputPath -IncludeWinRE:$IncludeWinRE
+        
+        # Clean up
+        Write-Host "Cleaning up temporary files..." -ForegroundColor Cyan
+        if (Test-Path -Path $tempWorkspacePath) {
+            Remove-Item -Path $tempWorkspacePath -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        Write-Host "Temporary files cleaned up" -ForegroundColor Green
+        
+        # Show summary
+        Show-Summary -WindowsImage $WimPath -ISOPath $OutputPath -IncludeWinRE:$IncludeWinRE
     }
-    
-    # Call the internal functions to perform the work
-    Initialize-BuildEnvironment -OutputPath $OutputPath
-    Test-WimFile -WimPath $WimPath
-    $tempWorkspacePath = New-WorkspaceDirectory -OutputPath $OutputPath
-    $PowerShell7File = Get-PowerShell7Package -PowerShell7Url $PowerShell7Url -TempPath $tempWorkspacePath
-    $workspacePath = Initialize-OSDCloudTemplate -TempPath $tempWorkspacePath
-    Copy-CustomWimToWorkspace -WimPath $WimPath -WorkspacePath $workspacePath
-    Copy-CustomizationScripts -WorkspacePath $workspacePath -ScriptPath (Split-Path -Parent $MyInvocation.MyCommand.Path)
-    $bootWimPath = Customize-WinPEWithPowerShell7 -TempPath $tempWorkspacePath -WorkspacePath $workspacePath -PowerShell7File $PowerShell7File
-    Optimize-ISOSize -WorkspacePath $workspacePath
-    New-CustomISO -WorkspacePath $workspacePath -OutputPath $OutputPath -ISOFileName $ISOFileName -IncludeWinRE:$IncludeWinRE
-    
-    if (-not $SkipCleanup) {
-        Remove-TempFiles -TempPath $tempWorkspacePath
+    catch {
+        Write-Error "An error occurred: $_"
+        throw
     }
-    
-    Show-Summary -WimPath $WimPath -ISOPath (Join-Path $OutputPath $ISOFileName) -IncludeWinRE:$IncludeWinRE
 }
