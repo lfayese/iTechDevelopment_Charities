@@ -52,30 +52,67 @@ if (Test-Path $testScript) {
     Write-Host "Test script not found at $testScript. Skipping tests." -ForegroundColor Yellow
 }
 
-# Create module output directory with version-specific folder
-$versionedModuleDir = Join-Path -Path $LocalRepositoryPath -ChildPath "$moduleName\$moduleVersion"
-if (Test-Path $versionedModuleDir) {
-    Remove-Item -Path $versionedModuleDir -Recurse -Force
+# Create both the PowerShell 5.1 and PowerShell 7 module directories
+$psModulePaths = @(
+    # PowerShell 5.1 paths
+    "$env:USERPROFILE\Documents\WindowsPowerShell\Modules",
+    "$env:ProgramFiles\WindowsPowerShell\Modules",
+    
+    # PowerShell 7 paths
+    "$env:USERPROFILE\Documents\PowerShell\Modules",
+    "$env:ProgramFiles\PowerShell\Modules"
+)
+
+# Install to the default user module location for both PS 5.1 and PS 7
+$ps51ModuleDir = Join-Path -Path "$env:USERPROFILE\Documents\WindowsPowerShell\Modules" -ChildPath "$moduleName"
+$ps7ModuleDir = Join-Path -Path "$env:USERPROFILE\Documents\PowerShell\Modules" -ChildPath "$moduleName"
+
+# Create the directories if they don't exist
+foreach ($dir in @($ps51ModuleDir, $ps7ModuleDir)) {
+    if (-not (Test-Path $dir)) {
+        New-Item -Path $dir -ItemType Directory -Force | Out-Null
+    } else {
+        # Clean up existing files if the directory exists
+        Remove-Item -Path "$dir\*" -Recurse -Force -ErrorAction SilentlyContinue
+    }
 }
-New-Item -Path $versionedModuleDir -ItemType Directory -Force | Out-Null
 
-Write-Host "Copying files to module directory: $versionedModuleDir" -ForegroundColor Cyan
+Write-Host "Copying module files to PowerShell 5.1 and PowerShell 7 directories..." -ForegroundColor Cyan
 
-# Copy module files to the versioned directory
-Copy-Item -Path (Join-Path -Path $moduleRoot -ChildPath "$moduleName.psd1") -Destination $versionedModuleDir
-Copy-Item -Path (Join-Path -Path $moduleRoot -ChildPath "$moduleName.psm1") -Destination $versionedModuleDir
-Copy-Item -Path (Join-Path -Path $moduleRoot -ChildPath "Public") -Destination $versionedModuleDir -Recurse
-Copy-Item -Path (Join-Path -Path $moduleRoot -ChildPath "Private") -Destination $versionedModuleDir -Recurse
+# Function to copy module files to a destination
+function Copy-ModuleFiles {
+    param(
+        [string]$Destination
+    )
+    
+    # Create the version directory for best practices
+    $versionDir = Join-Path -Path $Destination -ChildPath $moduleVersion
+    if (-not (Test-Path $versionDir)) {
+        New-Item -Path $versionDir -ItemType Directory -Force | Out-Null
+    }
+    
+    # Copy module files to both the base dir (for compatibility) and version dir (for best practices)
+    Copy-Item -Path (Join-Path -Path $moduleRoot -ChildPath "$moduleName.psd1") -Destination $Destination -Force
+    Copy-Item -Path (Join-Path -Path $moduleRoot -ChildPath "$moduleName.psm1") -Destination $Destination -Force
+    Copy-Item -Path (Join-Path -Path $moduleRoot -ChildPath "Public") -Destination $Destination -Recurse -Force
+    Copy-Item -Path (Join-Path -Path $moduleRoot -ChildPath "Private") -Destination $Destination -Recurse -Force
+    
+    # Copy to version directory as well
+    Copy-Item -Path (Join-Path -Path $moduleRoot -ChildPath "$moduleName.psd1") -Destination $versionDir -Force
+    Copy-Item -Path (Join-Path -Path $moduleRoot -ChildPath "$moduleName.psm1") -Destination $versionDir -Force
+    Copy-Item -Path (Join-Path -Path $moduleRoot -ChildPath "Public") -Destination $versionDir -Recurse -Force
+    Copy-Item -Path (Join-Path -Path $moduleRoot -ChildPath "Private") -Destination $versionDir -Recurse -Force
+}
 
-# Also copy to module base directory for compatibility
-$moduleBaseDir = Join-Path -Path $LocalRepositoryPath -ChildPath "$moduleName"
-Copy-Item -Path (Join-Path -Path $moduleRoot -ChildPath "$moduleName.psd1") -Destination $moduleBaseDir -Force
-Copy-Item -Path (Join-Path -Path $moduleRoot -ChildPath "$moduleName.psm1") -Destination $moduleBaseDir -Force
-Write-Host "Module files copied to base directory for compatibility" -ForegroundColor Green
+# Copy to PS 5.1 location
+Copy-ModuleFiles -Destination $ps51ModuleDir
+Write-Host "Module files copied to PowerShell 5.1 modules directory: $ps51ModuleDir" -ForegroundColor Green
 
-Write-Host "Module deployed successfully" -ForegroundColor Green
+# Copy to PS 7 location
+Copy-ModuleFiles -Destination $ps7ModuleDir
+Write-Host "Module files copied to PowerShell 7 modules directory: $ps7ModuleDir" -ForegroundColor Green
 
-# Create a package if needed
+# Create a package
 $outputDir = Join-Path -Path $moduleRoot -ChildPath "output"
 if (-not (Test-Path $outputDir)) {
     New-Item -Path $outputDir -ItemType Directory -Force | Out-Null
@@ -87,7 +124,7 @@ if (Test-Path $zipPath) {
 }
 
 Write-Host "Creating module package..." -ForegroundColor Cyan
-Compress-Archive -Path "$versionedModuleDir\*" -DestinationPath $zipPath -Force
+Compress-Archive -Path "$ps51ModuleDir\*" -DestinationPath $zipPath -Force
 Write-Host "Module package created: $zipPath" -ForegroundColor Green
 
 # Publish to PowerShell Gallery if requested
@@ -99,7 +136,7 @@ if ($PublishToGallery) {
     
     Write-Host "Publishing to PowerShell Gallery..." -ForegroundColor Cyan
     try {
-        Publish-Module -Path $versionedModuleDir -NuGetApiKey $ApiKey -Verbose
+        Publish-Module -Path $ps51ModuleDir -NuGetApiKey $ApiKey -Verbose
         Write-Host "Module published successfully." -ForegroundColor Green
     } catch {
         Write-Error "Failed to publish module: $_"
@@ -110,16 +147,19 @@ if ($PublishToGallery) {
 Write-Host "`nBuild completed successfully!" -ForegroundColor Green
 Write-Host "Version: $Version" -ForegroundColor Cyan
 Write-Host "Package: $zipPath" -ForegroundColor Cyan
-Write-Host "Module Path: $versionedModuleDir" -ForegroundColor Cyan
+Write-Host "PowerShell 5.1 Module Path: $ps51ModuleDir" -ForegroundColor Cyan
+Write-Host "PowerShell 7 Module Path: $ps7ModuleDir" -ForegroundColor Cyan
 
 if ($PublishToGallery) {
     Write-Host "Published to PowerShell Gallery: https://www.powershellgallery.com/packages/$moduleName" -ForegroundColor Cyan
 }
 
 # Provide instructions for using the module
-Write-Host "`nTo use the module, you can import it with:" -ForegroundColor Yellow
-Write-Host "Import-Module -Name $moduleName -RequiredVersion $Version" -ForegroundColor Yellow
-Write-Host "`nOr simply:" -ForegroundColor Yellow
+Write-Host "`nTo use the module in PowerShell 5.1, you can import it with:" -ForegroundColor Yellow
 Write-Host "Import-Module -Name $moduleName" -ForegroundColor Yellow
+
+Write-Host "`nTo use the module in PowerShell 7, you can import it with:" -ForegroundColor Yellow
+Write-Host "Import-Module -Name $moduleName" -ForegroundColor Yellow
+
 Write-Host "`nTo verify the module is loaded correctly:" -ForegroundColor Yellow
-Write-Host "Get-Module -Name $moduleName" -ForegroundColor Yellow
+Write-Host "Get-Module -Name $moduleName | Select-Object Name, Version" -ForegroundColor Yellow
