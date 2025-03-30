@@ -3,28 +3,32 @@
   "WorkspaceRootPath": "D:\\iTechDevelopment_Charities\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|D:\\iTechDevelopment_Charities\\OSDCloudCustomBuilder\\CodeCoverage.xml||{FA3CD31E-987B-443A-9B81-186104E8DAC1}",
-      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:OSDCloudCustomBuilder\\CodeCoverage.xml||{FA3CD31E-987B-443A-9B81-186104E8DAC1}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|D:\\iTechDevelopment_Charities\\OSDCloudCustomBuilder\\OSDCloudCustomBuilder.psd1||{3B902123-F8A7-4915-9F01-361F908088D0}",
-      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:OSDCloudCustomBuilder\\OSDCloudCustomBuilder.psd1||{3B902123-F8A7-4915-9F01-361F908088D0}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|D:\\iTechDevelopment_Charities\\OSDCloudCustomBuilder\\OSDCloudCustomBuilder.psm1||{3B902123-F8A7-4915-9F01-361F908088D0}",
-      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:OSDCloudCustomBuilder\\OSDCloudCustomBuilder.psm1||{3B902123-F8A7-4915-9F01-361F908088D0}"
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|D:\\iTechDevelopment_Charities\\OSDCloudCustomBuilder\\Private\\Test-WimFile.ps1||{3B902123-F8A7-4915-9F01-361F908088D0}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:OSDCloudCustomBuilder\\Private\\Test-WimFile.ps1||{3B902123-F8A7-4915-9F01-361F908088D0}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|D:\\iTechDevelopment_Charities\\OSDCloudCustomBuilder\\Private\\Show-Summary.ps1||{3B902123-F8A7-4915-9F01-361F908088D0}",
       "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:OSDCloudCustomBuilder\\Private\\Show-Summary.ps1||{3B902123-F8A7-4915-9F01-361F908088D0}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|D:\\iTechDevelopment_Charities\\OSDCloudCustomBuilder\\Private\\Remove-TempFiles.ps1||{3B902123-F8A7-4915-9F01-361F908088D0}",
-      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:OSDCloudCustomBuilder\\Private\\Remove-TempFiles.ps1||{3B902123-F8A7-4915-9F01-361F908088D0}"
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|D:\\iTechDevelopment_Charities\\OSDCloudCustomBuilder\\OSDCloudCustomBuilder.psm1||{3B902123-F8A7-4915-9F01-361F908088D0}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:OSDCloudCustomBuilder\\OSDCloudCustomBuilder.psm1||{3B902123-F8A7-4915-9F01-361F908088D0}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|D:\\iTechDevelopment_Charities\\OSDCloudCustomBuilder\\OSDCloudCustomBuilder.psd1||{3B902123-F8A7-4915-9F01-361F908088D0}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:OSDCloudCustomBuilder\\OSDCloudCustomBuilder.psd1||{3B902123-F8A7-4915-9F01-361F908088D0}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|D:\\iTechDevelopment_Charities\\OSDCloudCustomBuilder\\CodeCoverage.xml||{FA3CD31E-987B-443A-9B81-186104E8DAC1}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:OSDCloudCustomBuilder\\CodeCoverage.xml||{FA3CD31E-987B-443A-9B81-186104E8DAC1}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|D:\\iTechDevelopment_Charities\\OSDCloudCustomBuilder\\Public\\Add-CustomWimWithPwsh7.ps1||{3B902123-F8A7-4915-9F01-361F908088D0}",
       "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:OSDCloudCustomBuilder\\Public\\Add-CustomWimWithPwsh7.ps1||{3B902123-F8A7-4915-9F01-361F908088D0}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|D:\\iTechDevelopment_Charities\\OSDCloudCustomBuilder\\Private\\Remove-TempFiles.ps1||{3B902123-F8A7-4915-9F01-361F908088D0}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:OSDCloudCustomBuilder\\Private\\Remove-TempFiles.ps1||{3B902123-F8A7-4915-9F01-361F908088D0}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|D:\\iTechDevelopment_Charities\\OSDCloudCustomBuilder\\Private\\OSDCloudConfig.ps1||{3B902123-F8A7-4915-9F01-361F908088D0}",
@@ -98,7 +102,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 3,
+          "SelectedChildIndex": 6,
           "Children": [
             {
               "$type": "Document",
@@ -108,7 +112,7 @@
               "RelativeDocumentMoniker": "OSDCloudCustomBuilder\\OSDCloudCustomBuilder.psm1",
               "ToolTip": "D:\\iTechDevelopment_Charities\\OSDCloudCustomBuilder\\OSDCloudCustomBuilder.psm1",
               "RelativeToolTip": "OSDCloudCustomBuilder\\OSDCloudCustomBuilder.psm1",
-              "ViewState": "AgIAAKUAAAAAAAAAAAAAAAQAAABmAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
               "WhenOpened": "2025-03-30T21:29:31.837Z",
               "IsPinned": true,
@@ -116,7 +120,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 3,
               "Title": "OSDCloudCustomBuilder.psd1",
               "DocumentMoniker": "D:\\iTechDevelopment_Charities\\OSDCloudCustomBuilder\\OSDCloudCustomBuilder.psd1",
               "RelativeDocumentMoniker": "OSDCloudCustomBuilder\\OSDCloudCustomBuilder.psd1",
@@ -129,8 +133,20 @@
               "EditorCaption": ""
             },
             {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{1c4feeaa-4718-4aa9-859d-94ce25d182ba}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{aa2115a1-9712-457b-9047-dbb71ca2cdd2}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{3ae79031-e1bc-11d0-8f78-00a0c9110057}"
+            },
+            {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 1,
               "Title": "Show-Summary.ps1",
               "DocumentMoniker": "D:\\iTechDevelopment_Charities\\OSDCloudCustomBuilder\\Private\\Show-Summary.ps1",
               "RelativeDocumentMoniker": "OSDCloudCustomBuilder\\Private\\Show-Summary.ps1",
@@ -139,12 +155,24 @@
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
               "WhenOpened": "2025-03-30T21:20:47.466Z",
-              "IsPinned": true,
               "EditorCaption": ""
             },
             {
               "$type": "Document",
               "DocumentIndex": 0,
+              "Title": "Test-WimFile.ps1",
+              "DocumentMoniker": "D:\\iTechDevelopment_Charities\\OSDCloudCustomBuilder\\Private\\Test-WimFile.ps1",
+              "RelativeDocumentMoniker": "OSDCloudCustomBuilder\\Private\\Test-WimFile.ps1",
+              "ToolTip": "D:\\iTechDevelopment_Charities\\OSDCloudCustomBuilder\\Private\\Test-WimFile.ps1",
+              "RelativeToolTip": "OSDCloudCustomBuilder\\Private\\Test-WimFile.ps1",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2025-03-30T21:20:48.368Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
               "Title": "CodeCoverage.xml",
               "DocumentMoniker": "D:\\iTechDevelopment_Charities\\OSDCloudCustomBuilder\\CodeCoverage.xml",
               "RelativeDocumentMoniker": "OSDCloudCustomBuilder\\CodeCoverage.xml",
@@ -153,32 +181,11 @@
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003576|",
               "WhenOpened": "2025-03-30T21:20:15.464Z",
-              "IsPinned": true,
               "EditorCaption": ""
             },
             {
-              "$type": "Bookmark",
-              "Name": "ST:0:0:{aa2115a1-9712-457b-9047-dbb71ca2cdd2}"
-            },
-            {
-              "$type": "Bookmark",
-              "Name": "ST:0:0:{40ea2e6b-2121-4bb8-a43e-c83c04b51041}"
-            },
-            {
-              "$type": "Bookmark",
-              "Name": "ST:0:0:{f677620d-05fd-48ed-8423-72a12db4deef}"
-            },
-            {
-              "$type": "Bookmark",
-              "Name": "ST:0:0:{3ae79031-e1bc-11d0-8f78-00a0c9110057}"
-            },
-            {
-              "$type": "Bookmark",
-              "Name": "ST:0:0:{131369f2-062d-44a2-8671-91ff31efb4f4}"
-            },
-            {
               "$type": "Document",
-              "DocumentIndex": 4,
+              "DocumentIndex": 6,
               "Title": "Remove-TempFiles.ps1",
               "DocumentMoniker": "D:\\iTechDevelopment_Charities\\OSDCloudCustomBuilder\\Private\\Remove-TempFiles.ps1",
               "RelativeDocumentMoniker": "OSDCloudCustomBuilder\\Private\\Remove-TempFiles.ps1",
@@ -188,10 +195,6 @@
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
               "WhenOpened": "2025-03-30T21:20:46.678Z",
               "EditorCaption": ""
-            },
-            {
-              "$type": "Bookmark",
-              "Name": "ST:0:0:{c9c0ae26-aa77-11d2-b3f0-0000f87570ee}"
             },
             {
               "$type": "Document",
@@ -208,7 +211,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 6,
+              "DocumentIndex": 7,
               "Title": "OSDCloudConfig.ps1",
               "DocumentMoniker": "D:\\iTechDevelopment_Charities\\OSDCloudCustomBuilder\\Private\\OSDCloudConfig.ps1",
               "RelativeDocumentMoniker": "OSDCloudCustomBuilder\\Private\\OSDCloudConfig.ps1",
@@ -221,7 +224,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 7,
+              "DocumentIndex": 8,
               "Title": "Optimize-ISOSize.ps1",
               "DocumentMoniker": "D:\\iTechDevelopment_Charities\\OSDCloudCustomBuilder\\Private\\Optimize-ISOSize.ps1",
               "RelativeDocumentMoniker": "OSDCloudCustomBuilder\\Private\\Optimize-ISOSize.ps1",
@@ -234,7 +237,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 8,
+              "DocumentIndex": 9,
               "Title": "New-WorkspaceDirectory.ps1",
               "DocumentMoniker": "D:\\iTechDevelopment_Charities\\OSDCloudCustomBuilder\\Private\\New-WorkspaceDirectory.ps1",
               "RelativeDocumentMoniker": "OSDCloudCustomBuilder\\Private\\New-WorkspaceDirectory.ps1",
@@ -247,7 +250,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 9,
+              "DocumentIndex": 10,
               "Title": "New-CustomISO.ps1",
               "DocumentMoniker": "D:\\iTechDevelopment_Charities\\OSDCloudCustomBuilder\\Private\\New-CustomISO.ps1",
               "RelativeDocumentMoniker": "OSDCloudCustomBuilder\\Private\\New-CustomISO.ps1",
@@ -260,7 +263,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 10,
+              "DocumentIndex": 11,
               "Title": "Initialize-OSDEnvironment.ps1",
               "DocumentMoniker": "D:\\iTechDevelopment_Charities\\OSDCloudCustomBuilder\\Private\\Initialize-OSDEnvironment.ps1",
               "RelativeDocumentMoniker": "OSDCloudCustomBuilder\\Private\\Initialize-OSDEnvironment.ps1",
@@ -273,7 +276,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 11,
+              "DocumentIndex": 12,
               "Title": "Initialize-OSDCloudTemplate.ps1",
               "DocumentMoniker": "D:\\iTechDevelopment_Charities\\OSDCloudCustomBuilder\\Private\\Initialize-OSDCloudTemplate.ps1",
               "RelativeDocumentMoniker": "OSDCloudCustomBuilder\\Private\\Initialize-OSDCloudTemplate.ps1",
@@ -286,7 +289,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 12,
+              "DocumentIndex": 13,
               "Title": "Initialize-BuildEnvironment.ps1",
               "DocumentMoniker": "D:\\iTechDevelopment_Charities\\OSDCloudCustomBuilder\\Private\\Initialize-BuildEnvironment.ps1",
               "RelativeDocumentMoniker": "OSDCloudCustomBuilder\\Private\\Initialize-BuildEnvironment.ps1",
@@ -299,7 +302,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 13,
+              "DocumentIndex": 14,
               "Title": "Get-PowerShell7Package.ps1",
               "DocumentMoniker": "D:\\iTechDevelopment_Charities\\OSDCloudCustomBuilder\\Private\\Get-PowerShell7Package.ps1",
               "RelativeDocumentMoniker": "OSDCloudCustomBuilder\\Private\\Get-PowerShell7Package.ps1",
@@ -312,7 +315,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 14,
+              "DocumentIndex": 15,
               "Title": "Customize-WinPEWithPowerShell7.ps1",
               "DocumentMoniker": "D:\\iTechDevelopment_Charities\\OSDCloudCustomBuilder\\Private\\Customize-WinPEWithPowerShell7.ps1",
               "RelativeDocumentMoniker": "OSDCloudCustomBuilder\\Private\\Customize-WinPEWithPowerShell7.ps1",
@@ -325,7 +328,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 15,
+              "DocumentIndex": 16,
               "Title": "Copy-WimFileEfficiently.ps1",
               "DocumentMoniker": "D:\\iTechDevelopment_Charities\\OSDCloudCustomBuilder\\Private\\Copy-WimFileEfficiently.ps1",
               "RelativeDocumentMoniker": "OSDCloudCustomBuilder\\Private\\Copy-WimFileEfficiently.ps1",
@@ -338,7 +341,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 16,
+              "DocumentIndex": 17,
               "Title": "Copy-CustomWimToWorkspace.ps1",
               "DocumentMoniker": "D:\\iTechDevelopment_Charities\\OSDCloudCustomBuilder\\Private\\Copy-CustomWimToWorkspace.ps1",
               "RelativeDocumentMoniker": "OSDCloudCustomBuilder\\Private\\Copy-CustomWimToWorkspace.ps1",
@@ -351,7 +354,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 17,
+              "DocumentIndex": 18,
               "Title": "Copy-CustomizationScripts.ps1",
               "DocumentMoniker": "D:\\iTechDevelopment_Charities\\OSDCloudCustomBuilder\\Private\\Copy-CustomizationScripts.ps1",
               "RelativeDocumentMoniker": "OSDCloudCustomBuilder\\Private\\Copy-CustomizationScripts.ps1",
@@ -364,7 +367,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 19,
+              "DocumentIndex": 20,
               "Title": "iDcMDMOSDCloudGUI.ps1",
               "DocumentMoniker": "D:\\iTechDevelopment_Charities\\OSDCloud\\iDcMDMOSDCloudGUI.ps1",
               "RelativeDocumentMoniker": "OSDCloud\\iDcMDMOSDCloudGUI.ps1",
@@ -377,7 +380,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 21,
+              "DocumentIndex": 22,
               "Title": "README.md",
               "DocumentMoniker": "D:\\iTechDevelopment_Charities\\README.md",
               "RelativeDocumentMoniker": "README.md",
@@ -390,7 +393,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 18,
+              "DocumentIndex": 19,
               "Title": "iDCMDMUI.ps1",
               "DocumentMoniker": "D:\\iTechDevelopment_Charities\\OSDCloud\\iDCMDMUI.ps1",
               "RelativeDocumentMoniker": "OSDCloud\\iDCMDMUI.ps1",
@@ -403,7 +406,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 20,
+              "DocumentIndex": 21,
               "Title": "Autopilot.ps1",
               "DocumentMoniker": "D:\\iTechDevelopment_Charities\\OSDCloud\\Autopilot.ps1",
               "RelativeDocumentMoniker": "OSDCloud\\Autopilot.ps1",

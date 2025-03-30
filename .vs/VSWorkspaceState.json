@@ -2,7 +2,10 @@
   "ExpandedNodes": [
     "",
     "\\OSDCloud",
-    "\\OSDCloudCustomBuilder"
+    "\\OSDCloudCustomBuilder",
+    "\\OSDCloudCustomBuilder\\Private",
+    "\\OSDCloudCustomBuilder\\Public"
   ],
+  "SelectedNode": "\\README.md",
   "PreviewInSolutionExplorer": false
 }
