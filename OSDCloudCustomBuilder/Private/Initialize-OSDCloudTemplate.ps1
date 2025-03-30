@@ -1,30 +1,28 @@
 function Initialize-OSDCloudTemplate {
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory=$true)]
-        [string]$TempPath
+        [Parameter(Mandatory = $true)]
+        [string]$WorkspacePath
     )
     
-    Write-Host "Creating OSDCloud template and workspace..." -ForeColor Cyan
+    Write-Host "Creating OSDCloud workspace..." -ForeColor Cyan
     
-    # Step 1: Create a new OSDCloud template
-    $templateName = "CustomWIM"
+    # Try to create the workspace
     try {
-        New-OSDCloudTemplate -Name $templateName -Verbose
-    } catch {
-        Write-Error "Failed to create OSDCloud template: $_"
-        throw "Failed to create OSDCloud template: $_"
+        New-OSDCloudWorkspace -WorkspacePath $WorkspacePath
+    }
+    catch {
+        Write-Warning "Failed to create workspace using custom template, trying default..."
+        try {
+            New-OSDCloudWorkspace -WorkspacePath $WorkspacePath
+            Write-Host "Workspace created using default template" -ForegroundColor Green
+        }
+        catch {
+            Write-Error "Failed to create workspace: $_"
+            throw "Workspace creation failed"
+        }
     }
     
-    # Step 2: Create a new OSDCloud workspace
-    try {
-        $workspacePath = Join-Path $TempPath "OSDCloudWorkspace"
-        New-OSDCloudWorkspace -WorkspacePath $workspacePath -Verbose
-    } catch {
-        Write-Error "Failed to create OSDCloud workspace: $_"
-        throw "Failed to create OSDCloud workspace: $_"
-    }
-    
-    Write-Host "OSDCloud template and workspace created successfully" -ForeColor Green
-    return $workspacePath
+    Write-Host "OSDCloud workspace created successfully" -ForeColor Green
+    return $WorkspacePath
 }
