@@ -30,7 +30,7 @@
 #>
 function Add-CustomWimWithPwsh7 {
     [CmdletBinding()]
-    param (
+    param(
         [Parameter(Mandatory = $true)]
         [ValidateScript({
             if (-not (Test-Path $_ -PathType Leaf)) {
@@ -45,203 +45,186 @@ function Add-CustomWimWithPwsh7 {
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
         [string]$OutputPath,
-        [Parameter(Mandatory = $false)]
+        [Parameter()]
         [ValidateNotNullOrEmpty()]
         [string]$ISOFileName = "OSDCloudCustomWIM.iso",
-        [Parameter(Mandatory = $false)]
+        [Parameter()]
         [ValidateNotNullOrEmpty()]
         [string]$TempPath = "$env:TEMP\OSDCloudCustomBuilder",
-        [Parameter(Mandatory = $false)]
+        [Parameter()]
         [ValidatePattern('^\d+\.\d+\.\d+$')]
         [string]$PowerShellVersion = "7.3.4",
-        [Parameter(Mandatory = $false)]
+        [Parameter()]
         [switch]$IncludeWinRE,
-        [Parameter(Mandatory = $false)]
+        [Parameter()]
         [switch]$SkipCleanup,
-        [Parameter(Mandatory = $false)]
+        [Parameter()]
         [int]$TimeoutMinutes = 60
     )
     begin {
         $errorCollection = @()
         $operationTimeout = (Get-Date).AddMinutes($TimeoutMinutes)
+        
+        # Check for administrator privileges once
         try {
-            $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+            $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
+                [Security.Principal.WindowsBuiltInRole]::Administrator)
             if (-not $isAdmin) {
                 throw "This function requires administrator privileges to run properly."
             }
-        } catch {
+        }
+        catch {
             Write-Error "Failed to check administrator privileges: $_"
             throw "Administrator privilege check failed. Please run as administrator."
         }
+        
+        # Cache the drive letter once to reduce repeated lookups
         try {
-            $drive = (Split-Path -Path $TempPath -Qualifier) + '\'
-            $freeSpace = (Get-PSDrive -Name $drive[0] -ErrorAction Stop).Free
+            $tempDrive = (Split-Path -Path $TempPath -Qualifier)
+            # Assume drive letter is the first character of the qualifier
+            $driveLetter = $tempDrive.Substring(0,1)
+            $psDrive = Get-PSDrive -Name $driveLetter -ErrorAction Stop
+            $freeSpace = $psDrive.Free
             $requiredSpace = 15GB
             if ($freeSpace -lt $requiredSpace) {
-                throw "Insufficient disk space. Need at least $(($requiredSpace/1GB).ToString('N2')) GB, but only $(($freeSpace/1GB).ToString('N2')) GB available on $drive."
+                throw "Insufficient disk space. Need at least $(($requiredSpace / 1GB).ToString('N2')) GB, but only $(($freeSpace / 1GB).ToString('N2')) GB available on drive $tempDrive."
             }
-            Write-Verbose "Sufficient disk space available: $(($freeSpace/1GB).ToString('N2')) GB"
-        } catch {
+            Write-Verbose "Sufficient disk space available: $(($freeSpace / 1GB).ToString('N2')) GB"
+        }
+        catch {
             $errorCollection += "Disk space check failed: $_"
             Write-Warning "Could not verify disk space. Proceeding anyway, but may encounter space issues."
         }
+        
+        # Set up workspace paths and output ISO file path
         $workspacePath = Join-Path -Path $TempPath -ChildPath "Workspace"
         $tempWorkspacePath = Join-Path -Path $TempPath -ChildPath "TempWorkspace"
         if (-not $OutputPath.EndsWith(".iso")) {
             $OutputPath = Join-Path -Path $OutputPath -ChildPath $ISOFileName
         }
         $outputDirectory = Split-Path -Path $OutputPath -Parent
+        
+        # Create necessary directories in a single loop
         try {
-            $dirsToCreate = @(
-                $workspacePath,
-                $tempWorkspacePath,
-                $outputDirectory
-            ) | Where-Object { -not (Test-Path $_) }
-            if ($dirsToCreate.Count -gt 0) {
-                $dirsToCreate | ForEach-Object {
-                    Write-Verbose "Creating directory: $_"
-                    New-Item -Path $_ -ItemType Directory -Force -ErrorAction Stop | Out-Null
+            foreach ($dir in @($workspacePath, $tempWorkspacePath, $outputDirectory)) {
+                if (-not (Test-Path $dir)) {
+                    Write-Verbose "Creating directory: $dir"
+                    New-Item -Path $dir -ItemType Directory -Force -ErrorAction Stop | Out-Null
                 }
             }
-        } catch {
+        }
+        catch {
             $errorCollection += "Failed to create required directories: $_"
             throw "Directory creation failed: $_"
         }
     }
     process {
-        $jobs = @()
         try {
             Write-Verbose "Starting OSDCloud ISO creation process"
             if ((Get-Date) -gt $operationTimeout) {
                 throw "Operation timed out before completion."
             }
+            
+            # Copy the WIM file to the workspace
             $currentOperation = "Copying WIM file"
+            Write-Host "Copying custom WIM to workspace..." -ForegroundColor Cyan
             try {
-                Write-Host "Copying custom WIM to workspace..." -ForegroundColor Cyan
                 Copy-CustomWimToWorkspace -WimPath $WimPath -WorkspacePath $workspacePath -UseRobocopy -ErrorAction Stop
                 Write-Verbose "WIM file copied successfully"
-            } catch {
+            }
+            catch {
                 $errorCollection += "Error copying WIM file: $_"
                 throw "Failed during operation '$currentOperation': $_"
             }
-            $currentOperation = "Preparing parallel tasks"
-            try {
-                $currentOperation = "Adding PowerShell 7"
-                Write-Host "Adding PowerShell $PowerShellVersion support to WinPE..." -ForegroundColor Cyan
-                $jobs += Start-Job -ScriptBlock {
-                    param($tempPath, $workspacePath, $psVersion)
-                    try {
-                        Customize-WinPEWithPowerShell7 -TempPath $tempPath -WorkspacePath $workspacePath -PowerShellVersion $psVersion -ErrorAction Stop
-                        return @{ Success = $true; Message = "PowerShell 7 customization completed successfully" }
-                    } catch {
-                        return @{ Success = $false; Message = "PowerShell 7 customization failed: $_" }
-                    }
-                } -ArgumentList $tempWorkspacePath, $workspacePath, $PowerShellVersion
-                $currentOperation = "Optimizing ISO size"
-                Write-Host "Optimizing ISO size..." -ForegroundColor Cyan
-                $jobs += Start-Job -ScriptBlock {
-                    param($workspacePath)
-                    try {
-                        Optimize-ISOSize -WorkspacePath $workspacePath -ErrorAction Stop
-                        return @{ Success = $true; Message = "ISO size optimization completed successfully" }
-                    } catch {
-                        return @{ Success = $false; Message = "ISO size optimization failed: $_" }
-                    }
-                } -ArgumentList $workspacePath
-            } catch {
-                $errorCollection += "Error starting background jobs: $_"
-                throw "Failed during operation '$currentOperation': $_"
-            }
+            
+            # Launch background tasks in parallel to reduce overall processing time.
+            # Note: For very limited parallel tasks, the overhead of Start-Job is minimal.
+            $jobs = @()
+            $currentOperation = "Adding PowerShell 7 and Optimizing ISO Size"
+            Write-Host "Starting background tasks..." -ForegroundColor Cyan
+            
+            $jobs += Start-Job -ScriptBlock {
+                param($tempPath, $workspacePath, $psVersion)
+                try {
+                    Customize-WinPEWithPowerShell7 -TempPath $tempPath -WorkspacePath $workspacePath -PowerShellVersion $psVersion -ErrorAction Stop
+                    return @{ Success = $true; Message = "PowerShell 7 customization completed successfully" }
+                }
+                catch {
+                    return @{ Success = $false; Message = "PowerShell 7 customization failed: $_" }
+                }
+            } -ArgumentList $tempWorkspacePath, $workspacePath, $PowerShellVersion
+            
+            $jobs += Start-Job -ScriptBlock {
+                param($workspacePath)
+                try {
+                    Optimize-ISOSize -WorkspacePath $workspacePath -ErrorAction Stop
+                    return @{ Success = $true; Message = "ISO size optimization completed successfully" }
+                }
+                catch {
+                    return @{ Success = $false; Message = "ISO size optimization failed: $_" }
+                }
+            } -ArgumentList $workspacePath
+            
             $currentOperation = "Processing background jobs"
-            try {
-                # Use Wait-Job to efficiently wait for job completion with a timeout
-                $jobTimeoutSeconds = 20 * 60
-                if (-not (Wait-Job -Job $jobs -Timeout $jobTimeoutSeconds)) {
-                    throw "Background jobs timed out after 20 minutes."
-                }
-                $jobResults = $jobs | ForEach-Object {
-                    $result = Receive-Job -Job $_
-                    if (-not $result.Success) {
-                        $errorCollection += $result.Message
-                    }
-                    $result
-                }
-                $failedJobs = $jobResults | Where-Object { $_.Success -eq $false }
-                if ($failedJobs) {
-                    throw "One or more background tasks failed: $($failedJobs.Message -join ', ')"
-                }
-                $jobs | Remove-Job -Force
-            } catch {
-                $jobs | Where-Object { $_ } | Remove-Job -Force -ErrorAction SilentlyContinue
-                $errorCollection += "Error processing background jobs: $_"
-                throw "Failed during operation '$currentOperation': $_"
+            $jobTimeoutSeconds = 20 * 60
+            if (-not (Wait-Job -Job $jobs -Timeout $jobTimeoutSeconds)) {
+                throw "Background jobs timed out after 20 minutes."
             }
+            foreach ($job in $jobs) {
+                $result = Receive-Job -Job $job
+                if (-not $result.Success) {
+                    $errorCollection += $result.Message
+                }
+            }
+            Remove-Job -Job $jobs -Force
+            
+            if ($errorCollection.Count -gt 0) {
+                throw "One or more background tasks failed: $($errorCollection -join ', ')"
+            }
+            
+            # Create the ISO file
             $currentOperation = "Creating ISO file"
+            Write-Host "Creating custom ISO: $OutputPath" -ForegroundColor Cyan
             try {
-                Write-Host "Creating custom ISO: $OutputPath" -ForegroundColor Cyan
                 New-CustomISO -WorkspacePath $workspacePath -OutputPath $OutputPath -IncludeWinRE:$IncludeWinRE -ErrorAction Stop
                 Write-Verbose "ISO creation completed"
                 if (-not (Test-Path -Path $OutputPath)) {
                     throw "ISO file was not created at $OutputPath"
                 }
-            } catch {
+            }
+            catch {
                 $errorCollection += "Error creating ISO file: $_"
                 throw "Failed during operation '$currentOperation': $_"
             }
+            
+            # Generate a summary
             $currentOperation = "Generating summary"
             try {
                 Show-Summary -WindowsImage $WimPath -ISOPath $OutputPath -IncludeWinRE:$IncludeWinRE -ErrorAction Stop
-            } catch {
+            }
+            catch {
                 $errorCollection += "Error generating summary: $_"
                 Write-Warning "Could not generate summary: $_"
             }
+            
             Write-Host "✅ ISO created successfully at: $OutputPath" -ForegroundColor Green
-        } catch {
-            $mainError = $_
-            Write-Error "An error occurred during '$currentOperation': $_"
-            if ($errorCollection.Count -gt 0) {
-                Write-Host "Error details:" -ForegroundColor Red
-                $errorCollection | ForEach-Object { Write-Host "  - $_" -ForegroundColor Red }
-            }
-            throw $mainError
-        } finally {
-            if (-not $SkipCleanup) {
-                Write-Host "Cleaning up temporary files..." -ForegroundColor Cyan
-                try {
-                    @($tempWorkspacePath, $workspacePath) | 
-                    Where-Object { Test-Path -Path $_ } |
-                    ForEach-Object {
-                        Write-Verbose "Removing directory: $_"
-                        Remove-Item -Path $_ -Recurse -Force -ErrorAction SilentlyContinue
-                        if (Test-Path -Path $_) {
-                            Write-Warning "Could not completely remove directory: $_"
-                        }
-                    }
-                    Write-Host "Temporary files cleaned up" -ForegroundColor Green
-                } catch {
-                    Write-Warning "Error during cleanup: $_"
-                }
-            } else {
-                Write-Host "Skipping cleanup as requested" -ForegroundColor Yellow
-                Write-Host "Temporary files remain at: $TempPath" -ForegroundColor Yellow
-            }
-            if ($jobs.Count -gt 0) {
-                try {
-                    $jobs | Where-Object { $_ -and $_.State -ne 'Completed' } | 
-                    ForEach-Object {
-                        Stop-Job -Job $_ -ErrorAction SilentlyContinue
-                        Remove-Job -Job $_ -Force -ErrorAction SilentlyContinue
-                    }
-                } catch {
-                    Write-Warning "Error cleaning up background jobs: $_"
-                }
-            }
-            # Removed [System.GC]::Collect() to avoid unnecessary forced garbage collection
         }
-    }
-    end {
-        if ($errorCollection.Count -gt 0) {
-            Write-Warning "Completed with $($errorCollection.Count) warning(s)/error(s)"
+        catch {
+            Write-Error "An error occurred during '$currentOperation': $_"
+            throw $_
+        }
+        finally {
+            if (-not $SkipCleanup) {
+                try {
+                    if (Test-Path $TempPath) {
+                        Remove-Item -Path $TempPath -Recurse -Force -ErrorAction SilentlyContinue
+                        Write-Verbose "Cleaned up temporary files at $TempPath"
+                    }
+                }
+                catch {
+                    Write-Warning "Cleanup failed: $_"
+                }
+            }
         }
     }
 }

@@ -1,33 +1,30 @@
 # Set strict mode to catch common issues
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-
-# Import private functions first
-$PrivateFunctions = @()
-Get-ChildItem -Path "$PSScriptRoot\Private\*.ps1" -ErrorAction SilentlyContinue | ForEach-Object {
+# Import private functions first using a more efficient collection
+$PrivateFunctions = New-Object 'System.Collections.Generic.List[string]'
+foreach ($file in Get-ChildItem -Path "$PSScriptRoot\Private" -Filter *.ps1 -File -ErrorAction SilentlyContinue) {
     try {
-        Write-Verbose "Importing private function: $($_.FullName)"
-        . $_.FullName
-        $PrivateFunctions += $_.BaseName
+        Write-Verbose "Importing private function: $($file.FullName)"
+        . $file.FullName
+        $PrivateFunctions.Add($file.BaseName)
     }
     catch {
-        Write-Error "Failed to import private function $($_.FullName): $_"
+        Write-Error "Failed to import private function $($file.FullName): $_"
     }
 }
-
-# Import public functions
-$PublicFunctions = @()
-Get-ChildItem -Path "$PSScriptRoot\Public\*.ps1" -ErrorAction SilentlyContinue | ForEach-Object {
+# Import public functions using a more efficient collection
+$PublicFunctions = New-Object 'System.Collections.Generic.List[string]'
+foreach ($file in Get-ChildItem -Path "$PSScriptRoot\Public" -Filter *.ps1 -File -ErrorAction SilentlyContinue) {
     try {
-        Write-Verbose "Importing public function: $($_.FullName)"
-        . $_.FullName
-        $PublicFunctions += $_.BaseName
+        Write-Verbose "Importing public function: $($file.FullName)"
+        . $file.FullName
+        $PublicFunctions.Add($file.BaseName)
     }
     catch {
-        Write-Error "Failed to import public function $($_.FullName): $_"
+        Write-Error "Failed to import public function $($file.FullName): $_"
     }
 }
-
 # Verify required helper functions exist
 $RequiredHelpers = @(
     'Copy-CustomWimToWorkspace',
@@ -36,12 +33,10 @@ $RequiredHelpers = @(
     'New-CustomISO',
     'Show-Summary'
 )
-
 $MissingHelpers = $RequiredHelpers | Where-Object { $_ -notin $PrivateFunctions -and $_ -notin $PublicFunctions }
 if ($MissingHelpers.Count -gt 0) {
     Write-Warning "Missing required helper functions: $($MissingHelpers -join ', ')"
 }
-
 # Export only public functions listed in the module manifest
 # This ensures consistency between the .psd1 and .psm1 files
 $ManifestPath = Join-Path -Path $PSScriptRoot -ChildPath 'OSDCloudCustomBuilder.psd1'
