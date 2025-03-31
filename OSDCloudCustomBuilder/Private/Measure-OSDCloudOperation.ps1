@@ -1,4 +1,18 @@
-function Measure-OSDCloudOperation {
+function Measure-FunctionPerformance {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$Name,
+        
+        [Parameter(Mandatory = $true)]
+        [scriptblock]$ScriptBlock,
+        
+        [Parameter(Mandatory = $false)]
+        [object[]]$ArgumentList = @(),
+
+        [Parameter(Mandatory = $false)]
+        [int]$WarningThresholdMs = 1000
+    )
     [CmdletBinding()]
     param (
         [Parameter(Mandatory = $true)]
@@ -13,8 +27,9 @@ function Measure-OSDCloudOperation {
     
     $telemetryEnabled = $true
     
-    # Start timing
+    # Start timing and memory tracking
     $startTime = Get-Date
+    $startMemory = [System.GC]::GetTotalMemory($false)
     $success = $false
     $errorMessage = $null
     
@@ -41,12 +56,17 @@ function Measure-OSDCloudOperation {
         
         # Log telemetry if enabled
         if ($telemetryEnabled) {
+            $endMemory = [System.GC]::GetTotalMemory($false)
+            $memoryDelta = $endMemory - $startMemory
+
             $telemetryData = @{
                 Operation = $Name
                 Duration = $duration
                 Success = $success
                 Timestamp = $startTime.ToString('o')
                 Error = $errorMessage
+                MemoryUsageDelta = $memoryDelta
+                MemoryUsageDeltaMB = [math]::Round($memoryDelta / 1MB, 2)
             }
             
             # Log locally

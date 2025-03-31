@@ -11,6 +11,10 @@
 #>
 
 #region Module Setup
+# Enforce TLS 1.2 for secure communications
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+Write-Verbose "TLS 1.2 protocol enforced: $([Net.ServicePointManager]::SecurityProtocol)"
+
 # Set strict mode to catch common issues
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'

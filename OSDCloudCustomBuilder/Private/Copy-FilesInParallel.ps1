@@ -8,7 +8,7 @@ function Copy-FilesInParallel {
         [string]$DestinationPath,
         
         [Parameter()]
-        [int]$MaxThreads = 4
+        [int]$MaxThreads = 8
     )
     
     # Get all files to copy
@@ -26,7 +26,11 @@ function Copy-FilesInParallel {
     if ($useThreadJob) {
         # Use ThreadJob for parallel processing
         try {
+            $totalFiles = $files.Count
+            $processedFiles = 0
             $jobs = $files | ForEach-Object -ThrottleLimit $MaxThreads -Parallel {
+                $script:processedFiles++
+                Write-Progress -Activity "Copying Files" -Status "Processing file $script:processedFiles of $using:totalFiles" -PercentComplete (($script:processedFiles / $using:totalFiles) * 100)
                 $sourcePath = $_.FullName
                 $relativePath = $_.FullName.Substring($using:SourcePath.Length)
                 $destPath = Join-Path -Path $using:DestinationPath -ChildPath $relativePath
@@ -37,8 +41,12 @@ function Copy-FilesInParallel {
                 }
                 
                 try {
-                    Copy-Item -Path $sourcePath -Destination $destPath -Force
-                    $null = ($using:threadSafeList).Add($destPath)
+                    $copyTime = Measure-Command {
+                        Copy-Item -Path $sourcePath -Destination $destPath -Force
+                        $null = ($using:threadSafeList).Add($destPath)
+                    }
+                    Write-OSDCloudLog -Message "Copied $sourcePath in $($copyTime.TotalSeconds) seconds" -Level Info -Component "Copy-FilesInParallel"
+                    [System.GC]::Collect()
                 }
                 catch {
                     Write-Error "Failed to copy $sourcePath to $destPath: $_"
@@ -79,8 +87,25 @@ function Copy-FilesInParallel {
                     }
                     
                     try {
-                        Copy-Item -Path $file.FullName -Destination $targetPath -Force
-                        $list.Add($targetPath)
+                        $maxRetries = 3
+                        $retryCount = 0
+                        $success = $false
+                        
+                        while (-not $success -and $retryCount -lt $maxRetries) {
+                            try {
+                                Copy-Item -Path $file.FullName -Destination $targetPath -Force
+                                $list.Add($targetPath)
+                                $success = $true
+                            }
+                            catch {
+                                $retryCount++
+                                if ($retryCount -eq $maxRetries) {
+                                    Write-Error "Failed to copy $($file.FullName) to $targetPath after $maxRetries attempts: $_"
+                                    throw
+                                }
+                                Start-Sleep -Seconds ([Math]::Pow(2, $retryCount))
+                            }
+                        }
                     }
                     catch {
                         Write-Error "Failed to copy $($file.FullName) to $targetPath: $_"

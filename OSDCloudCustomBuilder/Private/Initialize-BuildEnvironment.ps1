@@ -5,7 +5,19 @@ function Initialize-BuildEnvironment {
         [string]$OutputPath
     )
     
+    # Enforce TLS 1.2
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
     Write-Host "Initializing build environment..." -ForeColor Cyan
+    
+    # Configure TLS 1.2
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        Write-Host "TLS 1.2 configured successfully" -ForeColor Green
+    } catch {
+        Write-Warning "Failed to configure TLS 1.2: $_"
+        Write-Warning "Some network operations may fail"
+    }
     
     # Ensure the OSDCloud module is installed and imported
     if (-not (Get-Module -ListAvailable -Name OSD)) {

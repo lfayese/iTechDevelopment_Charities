@@ -94,6 +94,7 @@ function Update-CustomWimWithPwsh7 {
         $config = Get-ModuleConfiguration
         
         # Log operation start
+        Write-OSDCloudLog -Message "TLS 1.2 enforced for secure communications" -Level Info -Component "Update-CustomWimWithPwsh7"
         Write-OSDCloudLog -Message "Starting OSDCloud ISO creation with custom WIM and PowerShell $PowerShellVersion" -Level Info -Component "Update-CustomWimWithPwsh7"
         
         # Check for administrator privileges once
@@ -112,6 +113,17 @@ function Update-CustomWimWithPwsh7 {
             throw "Administrator privilege check failed. Please run as administrator."
         }
         
+        # Enforce TLS 1.2
+        try {
+            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+            Write-OSDCloudLog -Message "TLS 1.2 enforced for secure communications" -Level Info -Component "Update-CustomWimWithPwsh7"
+        }
+        catch {
+            $errorMessage = "Failed to enforce TLS 1.2: $_"
+            Write-OSDCloudLog -Message $errorMessage -Level Error -Component "Update-CustomWimWithPwsh7" -Exception $_.Exception
+            throw $errorMessage
+        }
+
         # Cache the drive letter once to reduce repeated lookups
         try {
             $tempDrive = (Split-Path -Path $TempPath -Qualifier)

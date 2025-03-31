@@ -8,6 +8,9 @@
     Author: OSDCloud Team
 #>
 
+# Enforce TLS 1.2 for all web communications
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
 function Initialize-WinPEMountPoint {
     [CmdletBinding(SupportsShouldProcess=$true)]
     param (

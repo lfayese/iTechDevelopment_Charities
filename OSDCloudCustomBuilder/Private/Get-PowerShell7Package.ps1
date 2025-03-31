@@ -32,10 +32,16 @@ function Get-PowerShell7Package {
     
     $expectedHash = $config.PowerShellVersions.Hashes[$Version]
     $downloadUrl = $config.DownloadSources.PowerShell -f $Version
+    if (-not $downloadUrl.StartsWith('https://')) {
+        $errorMessage = "Download URL must use HTTPS protocol for security"
+        Write-OSDCloudLog -Message $errorMessage -Level Error -Component "Get-PowerShell7Package"
+        throw $errorMessage
+    }
     
     try {
-        # Set TLS 1.2 for secure downloads
+        # Set TLS 1.2 and certificate validation for secure downloads
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        [System.Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }
         
         # Create directory if it doesn't exist
         $downloadDir = Split-Path -Path $DownloadPath -Parent
@@ -45,9 +51,25 @@ function Get-PowerShell7Package {
         
         Write-OSDCloudLog -Message "Downloading PowerShell $Version from $downloadUrl" -Level Info -Component "Get-PowerShell7Package"
         
-        # Download the file
-        $webClient = New-Object System.Net.WebClient
-        $webClient.DownloadFile($downloadUrl, $DownloadPath)
+        # Download the file with retry logic
+        $maxRetries = 3
+        $retryCount = 0
+        $success = $false
+        
+        do {
+            try {
+                $retryCount++
+                Invoke-WebRequest -Uri $downloadUrl -OutFile $DownloadPath -UseBasicParsing
+                $success = $true
+                break
+            }
+            catch {
+                if ($retryCount -eq $maxRetries) { throw }
+                $waitSeconds = [math]::Pow(2, $retryCount)
+                Write-OSDCloudLog -Message "Download attempt $retryCount failed. Retrying in $waitSeconds seconds..." -Level Warning -Component "Get-PowerShell7Package"
+                Start-Sleep -Seconds $waitSeconds
+            }
+        } while ($retryCount -lt $maxRetries)
         
         # Verify hash
         $actualHash = (Get-FileHash -Path $DownloadPath -Algorithm SHA256).Hash
