@@ -43,6 +43,10 @@ else {
 
 # Check if running in PS7+ for faster methods
 $script:IsPS7OrHigher = $PSVersionTable.PSVersion.Major -ge 7
+
+# Cache logger command existence for performance
+$script:LoggerExists = (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) -ne $null
+Write-Verbose "Logger command existence cached: $script:LoggerExists"
 #endregion Module Setup
 
 #region Function Import

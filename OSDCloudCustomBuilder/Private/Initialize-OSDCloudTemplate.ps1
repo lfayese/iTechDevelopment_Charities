@@ -23,14 +23,14 @@ function Initialize-OSDCloudTemplate {
     
     begin {
         # Log operation start
-        if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+        if ($script:LoggerExists) {
             Invoke-OSDCloudLogger -Message "Initializing OSDCloud template at $WorkspacePath" -Level Info -Component "Initialize-OSDCloudTemplate"
         }
         
         # Check if OSD module is available
         if (-not (Get-Module -Name OSD -ListAvailable)) {
             $errorMessage = "OSD module is required but not installed. Please install it using 'Install-Module OSD -Force'"
-            if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+            if ($script:LoggerExists) {
                 Invoke-OSDCloudLogger -Message $errorMessage -Level Error -Component "Initialize-OSDCloudTemplate"
             }
             else {
@@ -59,32 +59,32 @@ function Initialize-OSDCloudTemplate {
                     
                     # Try to create with custom template first
                     if ($config -and $config.CustomOSDCloudTemplate) {
-                        if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+                        if ($script:LoggerExists) {
                             Invoke-OSDCloudLogger -Message "Attempting to create workspace using custom template" -Level Info -Component "Initialize-OSDCloudTemplate"
                         }
                         
                         New-OSDCloudWorkspace -WorkspacePath $WorkspacePath -TemplateJSON $config.CustomOSDCloudTemplate -ErrorAction Stop
                         
-                        if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+                        if ($script:LoggerExists) {
                             Invoke-OSDCloudLogger -Message "Workspace created using custom template" -Level Info -Component "Initialize-OSDCloudTemplate"
                         }
                     }
                     else {
                         # No custom template specified, use default
-                        if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+                        if ($script:LoggerExists) {
                             Invoke-OSDCloudLogger -Message "No custom template specified, using default" -Level Info -Component "Initialize-OSDCloudTemplate"
                         }
                         
                         New-OSDCloudWorkspace -WorkspacePath $WorkspacePath -ErrorAction Stop
                         
-                        if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+                        if ($script:LoggerExists) {
                             Invoke-OSDCloudLogger -Message "Workspace created using default template" -Level Info -Component "Initialize-OSDCloudTemplate"
                         }
                     }
                 }
                 catch {
                     $warningMessage = "Failed to create workspace using custom template, trying default..."
-                    if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+                    if ($script:LoggerExists) {
                         Invoke-OSDCloudLogger -Message $warningMessage -Level Warning -Component "Initialize-OSDCloudTemplate" -Exception $_.Exception
                     }
                     else {
@@ -95,7 +95,7 @@ function Initialize-OSDCloudTemplate {
                         New-OSDCloudWorkspace -WorkspacePath $WorkspacePath -ErrorAction Stop
                         
                         $successMessage = "Workspace created using default template"
-                        if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+                        if ($script:LoggerExists) {
                             Invoke-OSDCloudLogger -Message $successMessage -Level Info -Component "Initialize-OSDCloudTemplate"
                         }
                         else {
@@ -104,7 +104,7 @@ function Initialize-OSDCloudTemplate {
                     }
                     catch {
                         $errorMessage = "Failed to create workspace: $_"
-                        if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+                        if ($script:LoggerExists) {
                             Invoke-OSDCloudLogger -Message $errorMessage -Level Error -Component "Initialize-OSDCloudTemplate" -Exception $_.Exception
                         }
                         else {
@@ -116,7 +116,7 @@ function Initialize-OSDCloudTemplate {
             }
             
             $successMessage = "OSDCloud workspace created successfully"
-            if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+            if ($script:LoggerExists) {
                 Invoke-OSDCloudLogger -Message $successMessage -Level Info -Component "Initialize-OSDCloudTemplate"
             }
             else {
@@ -127,7 +127,7 @@ function Initialize-OSDCloudTemplate {
         }
         catch {
             $errorMessage = "Failed to initialize OSDCloud template: $_"
-            if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+            if ($script:LoggerExists) {
                 Invoke-OSDCloudLogger -Message $errorMessage -Level Error -Component "Initialize-OSDCloudTemplate" -Exception $_.Exception
             }
             else {

@@ -26,7 +26,7 @@ function Initialize-WinPEMountPoint {
     
     begin {
         # Log operation start
-        if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+        if ($script:LoggerExists) {
             Invoke-OSDCloudLogger -Message "Initializing WinPE mount point in $TempPath" -Level Info -Component "Initialize-WinPEMountPoint"
         }
     }
@@ -47,7 +47,7 @@ function Initialize-WinPEMountPoint {
             }
             
             # Log success
-            if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+            if ($script:LoggerExists) {
                 Invoke-OSDCloudLogger -Message "WinPE mount point initialized successfully" -Level Info -Component "Initialize-WinPEMountPoint"
             }
             

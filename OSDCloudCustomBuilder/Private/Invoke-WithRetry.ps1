@@ -57,9 +57,10 @@ function Invoke-WithRetry {
     )
     begin {
         # Cache the logger command availability
-        $loggerCommand = Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue
+        # Use the module-level cached logger existence check
+        $loggerExists = $script:LoggerExists
         
-        if ($loggerCommand) {
+        if ($loggerExists) {
             Invoke-OSDCloudLogger -Message "Starting $OperationName with retry logic (max retries: $MaxRetries)" -Level Info -Component "Invoke-WithRetry"
         }
         else {
@@ -85,7 +86,7 @@ function Invoke-WithRetry {
                 # Execute the script block
                 $result = & $ScriptBlock
                 # Log success
-                if ($loggerCommand) {
+                if ($loggerExists) {
                     Invoke-OSDCloudLogger -Message "$OperationName completed successfully" -Level Info -Component "Invoke-WithRetry"
                 }
                 else {
@@ -107,7 +108,7 @@ function Invoke-WithRetry {
                     $delayMs = [int]($delayWithJitter * 1000)
                     # Log retry attempt
                     $errorMessage = "$OperationName failed with retryable error: $($_.Exception.Message). Retrying in $([Math]::Round($delayWithJitter, 2)) seconds (attempt $retryCount of $MaxRetries)."
-                    if ($loggerCommand) {
+                    if ($loggerExists) {
                         Invoke-OSDCloudLogger -Message $errorMessage -Level Warning -Component "Invoke-WithRetry" -Exception $_.Exception
                     }
                     else {
@@ -124,7 +125,7 @@ function Invoke-WithRetry {
                     else {
                         $errorMessage = "Non-retryable error in $OperationName $($_.Exception.Message)"
                     }
-                    if ($loggerCommand) {
+                    if ($loggerExists) {
                         Invoke-OSDCloudLogger -Message $errorMessage -Level Error -Component "Invoke-WithRetry" -Exception $_.Exception
                     }
                     else {

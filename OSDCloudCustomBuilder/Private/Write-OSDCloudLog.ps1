@@ -71,7 +71,7 @@ function Write-OSDCloudLog {
     }
     
     # If Invoke-OSDCloudLogger exists, also log through it
-    if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+    if ($script:LoggerExists) {
         Invoke-OSDCloudLogger -Message $Message -Level $Level -Component $Component -Exception $Exception
     }
 }

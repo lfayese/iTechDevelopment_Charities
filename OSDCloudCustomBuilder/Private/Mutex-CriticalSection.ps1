@@ -54,7 +54,8 @@ function Enter-CriticalSection {
         $gotLock = $false
         
         # Log operation start
-        if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+        if ($script:LoggerExists) {        # Log operation start
+        if ($script:LoggerExists) {
             Invoke-OSDCloudLogger -Message "Attempting to enter critical section '$Name'" -Level Verbose -Component "Enter-CriticalSection"
         }
     }
@@ -69,7 +70,7 @@ function Enter-CriticalSection {
                 # Check if we've exceeded timeout
                 if ((New-TimeSpan -Start $startTime -End (Get-Date)).TotalSeconds -gt $Timeout) {
                     $errorMessage = "Timeout waiting for lock on $Name"
-                    if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+                    if ($script:LoggerExists) {
                         Invoke-OSDCloudLogger -Message $errorMessage -Level Error -Component "Enter-CriticalSection"
                     }
                     throw $errorMessage
@@ -80,7 +81,7 @@ function Enter-CriticalSection {
                 
                 if (-not $gotLock) {
                     $waitMessage = "Waiting for lock on $Name..."
-                    if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+                    if ($script:LoggerExists) {
                         Invoke-OSDCloudLogger -Message $waitMessage -Level Verbose -Component "Enter-CriticalSection"
                     }
                     else {
@@ -91,7 +92,7 @@ function Enter-CriticalSection {
             }
             
             # Log success
-            if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+            if ($script:LoggerExists) {
                 Invoke-OSDCloudLogger -Message "Successfully entered critical section '$Name'" -Level Verbose -Component "Enter-CriticalSection"
             }
             
@@ -109,7 +110,7 @@ function Enter-CriticalSection {
             }
             
             $errorMessage = "Failed to acquire lock: $_"
-            if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+            if ($script:LoggerExists) {
                 Invoke-OSDCloudLogger -Message $errorMessage -Level Error -Component "Enter-CriticalSection" -Exception $_.Exception
             }
             else {
@@ -149,7 +150,7 @@ function Exit-CriticalSection {
     
     begin {
         # Log operation start
-        if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+        if ($script:LoggerExists) {
             Invoke-OSDCloudLogger -Message "Exiting critical section" -Level Verbose -Component "Exit-CriticalSection"
         }
     }
@@ -162,13 +163,13 @@ function Exit-CriticalSection {
                 $Mutex.Dispose()
                 
                 # Log success
-                if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+                if ($script:LoggerExists) {
                     Invoke-OSDCloudLogger -Message "Successfully exited critical section" -Level Verbose -Component "Exit-CriticalSection"
                 }
             }
             catch {
                 $errorMessage = "Error releasing mutex: $_"
-                if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+                if ($script:LoggerExists) {
                     Invoke-OSDCloudLogger -Message $errorMessage -Level Warning -Component "Exit-CriticalSection" -Exception $_.Exception
                 }
                 else {

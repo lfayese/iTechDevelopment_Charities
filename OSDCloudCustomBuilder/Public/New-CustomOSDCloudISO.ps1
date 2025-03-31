@@ -60,7 +60,7 @@ function New-CustomOSDCloudISO {
     
     begin {
         # Log operation start
-        if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+        if ($script:LoggerExists) {
             Invoke-OSDCloudLogger -Message "Starting custom OSDCloud ISO build with PowerShell $PwshVersion" -Level Info -Component "New-CustomOSDCloudISO"
         }
         else {
