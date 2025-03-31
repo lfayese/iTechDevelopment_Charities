@@ -1,3 +1,31 @@
 {
-    "CodeGPT.apiKey": "CodeGPT Plus"
+    "CodeGPT.apiKey": "CodeGPT Plus",
+    "editor.wordWrap": "on",
+    "editor.bracketPairColorization.independentColorPoolPerBracketType": true,
+    "editor.experimental.preferTreeSitter.ini": true,
+    "editor.experimental.preferTreeSitter.typescript": true,
+    "editor.experimental.treeSitterTelemetry": true,
+    "editor.experimentalEditContextEnabled": true,
+    "editor.experimentalGpuAcceleration": "on",
+    "editor.inlayHints.padding": true,
+    "editor.tabCompletion": "on",
+    "scm.alwaysShowActions": true,
+    "scm.alwaysShowRepositories": true,
+    "search.useGlobalIgnoreFiles": true,
+    "search.useParentIgnoreFiles": true,
+    "scm.diffDecorationsGutterPattern": {
+        "added": true
+    },
+    "github.copilot.nextEditSuggestions.enabled": true,
+    "github.copilot.chat.completionContext.typescript.mode": "on",
+    "github.copilot.chat.languageContext.typescript.enabled": true,
+    "html.format.indentHandlebars": true,
+    "html.format.indentInnerHtml": true,
+    "html.format.templating": true,
+    "markdown.occurrencesHighlight.enabled": true,
+    "markdown.preview.typographer": true,
+    "npm.enableRunFromFolder": true,
+    "python.analysis.completeFunctionParens": true,
+    "python.analysis.enablePerfTelemetry": true,
+    "remoteHub.gitProtocol": "ssh"
 }

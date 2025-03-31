@@ -3,5 +3,9 @@
 		{
 			"path": "."
 		}
-	]
+	],
+	"settings": {
+		"bitoAI.codeCompletion.enableCommentToCode": true,
+		"bitoAI.codeCompletion.enableAutoCompletion": false
+	}
 }
