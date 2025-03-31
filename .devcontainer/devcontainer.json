@@ -1,0 +1,38 @@
+{
+    "name": "PowerShell 7.5.0 Development",
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-vscode.powershell",
+                "github.copilot",
+                "github.copilot-chat",
+                "streetsidesoftware.code-spell-checker",
+                "msazurermtools.azurerm-vscode-tools",
+                "redhat.vscode-yaml",
+                "eamodio.gitlens",
+                "ms-vscode-remote.remote-containers"
+            ],
+            "settings": {
+                "terminal.integrated.defaultProfile.linux": "pwsh",
+                "powershell.codeFormatting.preset": "OTBS",
+                "powershell.scriptAnalysis.enable": true,
+                "powershell.startAutomatically": true,
+                "editor.formatOnSave": true,
+                "editor.formatOnPaste": true,
+                "files.trimTrailingWhitespace": true
+            }
+        }
+    },
+    "features": {
+        "ghcr.io/devcontainers/features/github-cli:1": {},
+        "ghcr.io/devcontainers/features/common-utils:2": {}
+    },
+    "postCreateCommand": "pwsh -Command 'Import-Module Pester; Import-Module PSScriptAnalyzer; Write-Host \"PowerShell development environment ready\" -ForegroundColor Green'",
+    "remoteUser": "vscode",
+    "mounts": [
+        "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached"
+    ]
+}
