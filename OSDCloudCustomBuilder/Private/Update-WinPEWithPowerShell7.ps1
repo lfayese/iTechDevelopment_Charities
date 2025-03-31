@@ -13,6 +13,12 @@
     The PowerShell version to install. Default is "7.3.4".
 .PARAMETER PowerShell7File
     The path to the PowerShell 7 zip file. If not specified, it will be downloaded.
+.PARAMETER MountTimeout
+    Maximum time in seconds to wait for mount operations (default: from configuration).
+.PARAMETER DismountTimeout
+    Maximum time in seconds to wait for dismount operations (default: from configuration).
+.PARAMETER DownloadTimeout
+    Maximum time in seconds to wait for download operations (default: from configuration).
 .EXAMPLE
     Update-WinPEWithPowerShell7 -TempPath "C:\Temp\OSDCloud" -WorkspacePath "C:\OSDCloud\Workspace"
 .EXAMPLE
@@ -34,8 +40,13 @@ function Update-WinPEWithPowerShell7 {
         [string]$WorkspacePath,
         
         [Parameter()]
-        [ValidatePattern('^(\d+\.\d+\.\d+)$')]
-        [string]$PowerShellVersion = "7.3.4",
+        [ValidateScript({
+            if (Test-ValidPowerShellVersion -Version $_) { 
+                return $true 
+            }
+            throw "Invalid PowerShell version format. Must be in X.Y.Z format and be a supported version."
+        })]
+        [string]$PowerShellVersion,
         
         [Parameter()]
         [ValidateScript({
@@ -48,56 +59,72 @@ function Update-WinPEWithPowerShell7 {
             }
             return $true
         })]
-        [string]$PowerShell7File
+        [string]$PowerShell7File,
+        
+        [Parameter()]
+        [int]$MountTimeout,
+        
+        [Parameter()]
+        [int]$DismountTimeout,
+        
+        [Parameter()]
+        [int]$DownloadTimeout
     )
     
     begin {
         # Generate a unique ID for this execution instance
         $instanceId = [Guid]::NewGuid().ToString()
         
-        # Log operation start
-        if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
-            Invoke-OSDCloudLogger -Message "Starting WinPE update with PowerShell 7 v$PowerShellVersion" -Level Info -Component "Update-WinPEWithPowerShell7"
+        # Get module configuration
+        $config = Get-ModuleConfiguration
+        
+        # Set default PowerShell version if not specified
+        if (-not $PowerShellVersion) {
+            $PowerShellVersion = $config.PowerShellVersions.Default
+            Write-OSDCloudLog -Message "Using default PowerShell version: $PowerShellVersion" -Level Info -Component "Update-WinPEWithPowerShell7"
         }
         
-        # If PowerShell7File is not specified, download it
+        # Apply timeout parameters from config if not specified
+        if (-not $MountTimeout) {
+            $MountTimeout = $config.Timeouts.Mount
+        }
+        
+        if (-not $DismountTimeout) {
+            $DismountTimeout = $config.Timeouts.Dismount
+        }
+        
+        if (-not $DownloadTimeout) {
+            $DownloadTimeout = $config.Timeouts.Download
+        }
+        
+        # Log operation start
+        Write-OSDCloudLog -Message "Starting WinPE update with PowerShell 7 v$PowerShellVersion" -Level Info -Component "Update-WinPEWithPowerShell7"
+        
+        # If PowerShell7File is not specified, try to use cached or download it
         if ([string]::IsNullOrEmpty($PowerShell7File)) {
             try {
-                if (Get-Command -Name Get-PowerShell7Package -ErrorAction SilentlyContinue) {
-                    $PowerShell7File = Get-PowerShell7Package -Version $PowerShellVersion -DownloadPath $TempPath
+                # First check if we have a cached copy
+                $cachedPackage = Get-CachedPowerShellPackage -Version $PowerShellVersion
+                if ($cachedPackage) {
+                    $PowerShell7File = $cachedPackage
+                    Write-OSDCloudLog -Message "Using cached PowerShell 7 package: $PowerShell7File" -Level Info -Component "Update-WinPEWithPowerShell7"
+                }
+                else {
+                    # Download the package
+                    $downloadPath = Join-Path -Path $TempPath -ChildPath "PowerShell-$PowerShellVersion-win-x64.zip"
+                    
+                    Write-OSDCloudLog -Message "Downloading PowerShell 7 v$PowerShellVersion" -Level Info -Component "Update-WinPEWithPowerShell7"
+                    
+                    $PowerShell7File = Get-PowerShell7Package -Version $PowerShellVersion -DownloadPath $downloadPath
                     
                     if (-not $PowerShell7File -or -not (Test-Path $PowerShell7File)) {
                         throw "Failed to download PowerShell 7 package"
                     }
                 }
-                else {
-                    # Fallback to direct download if Get-PowerShell7Package is not available
-                    $downloadUrl = "https://github.com/PowerShell/PowerShell/releases/download/v$PowerShellVersion/PowerShell-$PowerShellVersion-win-x64.zip"
-                    $PowerShell7File = Join-Path -Path $TempPath -ChildPath "PowerShell-$PowerShellVersion-win-x64.zip"
-                    
-                    if (-not (Test-Path $PowerShell7File)) {
-                        if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
-                            Invoke-OSDCloudLogger -Message "Downloading PowerShell 7 v$PowerShellVersion from $downloadUrl" -Level Info -Component "Update-WinPEWithPowerShell7"
-                        }
-                        
-                        # Create directory if it doesn't exist
-                        if (-not (Test-Path -Path $TempPath)) {
-                            New-Item -Path $TempPath -ItemType Directory -Force | Out-Null
-                        }
-                        
-                        # Download the file
-                        Invoke-WebRequest -Uri $downloadUrl -OutFile $PowerShell7File -UseBasicParsing
-                    }
-                }
             }
             catch {
                 $errorMessage = "Failed to download PowerShell 7 package: $_"
-                if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
-                    Invoke-OSDCloudLogger -Message $errorMessage -Level Error -Component "Update-WinPEWithPowerShell7" -Exception $_.Exception
-                }
-                else {
-                    Write-Error $errorMessage
-                }
+                Write-OSDCloudLog -Message $errorMessage -Level Error -Component "Update-WinPEWithPowerShell7" -Exception $_.Exception
                 throw
             }
         }
@@ -105,12 +132,7 @@ function Update-WinPEWithPowerShell7 {
         # Verify PowerShell 7 file exists
         if (-not (Test-Path -Path $PowerShell7File)) {
             $errorMessage = "PowerShell 7 file not found at path: $PowerShell7File"
-            if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
-                Invoke-OSDCloudLogger -Message $errorMessage -Level Error -Component "Update-WinPEWithPowerShell7"
-            }
-            else {
-                Write-Error $errorMessage
-            }
+            Write-OSDCloudLog -Message $errorMessage -Level Error -Component "Update-WinPEWithPowerShell7"
             throw $errorMessage
         }
     }
@@ -133,12 +155,7 @@ function Update-WinPEWithPowerShell7 {
             $wimPath = Join-Path -Path $WorkspacePath -ChildPath "Media\Sources\boot.wim"
             if (-not (Test-Path -Path $wimPath)) {
                 $errorMessage = "WinPE image not found at path: $wimPath"
-                if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
-                    Invoke-OSDCloudLogger -Message $errorMessage -Level Error -Component "Update-WinPEWithPowerShell7"
-                }
-                else {
-                    Write-Error $errorMessage
-                }
+                Write-OSDCloudLog -Message $errorMessage -Level Error -Component "Update-WinPEWithPowerShell7"
                 throw $errorMessage
             }
             
@@ -167,21 +184,14 @@ function Update-WinPEWithPowerShell7 {
             }
             
             # Log success
-            if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
-                Invoke-OSDCloudLogger -Message "WinPE update with PowerShell 7 completed successfully" -Level Info -Component "Update-WinPEWithPowerShell7"
-            }
+            Write-OSDCloudLog -Message "WinPE update with PowerShell 7 completed successfully" -Level Info -Component "Update-WinPEWithPowerShell7"
             
             # Return the boot.wim path
             return $wimPath
         }
         catch {
             $errorMessage = "Failed to update WinPE: $_"
-            if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
-                Invoke-OSDCloudLogger -Message $errorMessage -Level Error -Component "Update-WinPEWithPowerShell7" -Exception $_.Exception
-            }
-            else {
-                Write-Error $errorMessage
-            }
+            Write-OSDCloudLog -Message $errorMessage -Level Error -Component "Update-WinPEWithPowerShell7" -Exception $_.Exception
             
             # Try to dismount if mounted (don't save changes)
             try {
@@ -193,12 +203,7 @@ function Update-WinPEWithPowerShell7 {
             }
             catch {
                 $cleanupError = "Error during cleanup: $_"
-                if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
-                    Invoke-OSDCloudLogger -Message $cleanupError -Level Warning -Component "Update-WinPEWithPowerShell7" -Exception $_.Exception
-                }
-                else {
-                    Write-Warning $cleanupError
-                }
+                Write-OSDCloudLog -Message $cleanupError -Level Warning -Component "Update-WinPEWithPowerShell7" -Exception $_.Exception
             }
             
             throw
@@ -217,15 +222,15 @@ function Update-WinPEWithPowerShell7 {
                         Remove-Item -Path $mountInfo.PS7TempPath -Recurse -Force -ErrorAction SilentlyContinue
                     }
                 }
+                
+                # Force garbage collection to free up memory
+                [System.GC]::Collect()
+                
+                Write-OSDCloudLog -Message "Cleanup of temporary resources completed" -Level Info -Component "Update-WinPEWithPowerShell7"
             }
             catch {
                 $cleanupError = "Error cleaning up temporary resources: $_"
-                if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
-                    Invoke-OSDCloudLogger -Message $cleanupError -Level Warning -Component "Update-WinPEWithPowerShell7" -Exception $_.Exception
-                }
-                else {
-                    Write-Warning $cleanupError
-                }
+                Write-OSDCloudLog -Message $cleanupError -Level Warning -Component "Update-WinPEWithPowerShell7" -Exception $_.Exception
             }
         }
     }

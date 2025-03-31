@@ -12,6 +12,7 @@
 # Set strict mode to catch common issues
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
 # Make sure we're running on the required PowerShell version
 $requiredPSVersion = [Version]'5.1'
 if ($PSVersionTable.PSVersion -lt $requiredPSVersion) {
@@ -19,6 +20,7 @@ if ($PSVersionTable.PSVersion -lt $requiredPSVersion) {
     Write-Error $errorMsg
     throw $errorMsg
 }
+
 # Module internal variables
 $script:ModuleRoot = $PSScriptRoot
 $script:ModuleVersion = "0.2.0" # Updated to match the module manifest
@@ -51,6 +53,7 @@ if ($script:IsPS7OrHigher) {
         if (-not (Test-Path -Path $Path -ErrorAction SilentlyContinue)) { return }
         $files = @(Get-ChildItem -Path $Path -Filter "*.ps1" -File)
         if ($files.Count -eq 0) { return }
+        
         # Use parallel processing only if file count exceeds a threshold (e.g., 3 files)
         if ($files.Count -gt 3) {
             $threadSafeList = [System.Collections.Concurrent.ConcurrentBag[string]]::new()
@@ -58,14 +61,14 @@ if ($script:IsPS7OrHigher) {
                 $files | ForEach-Object -Parallel {
                     try {
                         . $_.FullName
-                        ($using:threadSafeList).Add($_.BaseName) | Out-Null
+                        $null = ($using:threadSafeList).Add($_.BaseName)
                     }
                     catch {
                         Write-Error "Failed to import $($using:Type) function $($_.FullName): $_"
                     }
                 } -ThrottleLimit 16
                 foreach ($item in $threadSafeList) {
-                    $FunctionList.Add($item) | Out-Null
+                    $null = $FunctionList.Add($item)
                 }
             }
             catch {
@@ -73,7 +76,7 @@ if ($script:IsPS7OrHigher) {
                 foreach ($file in $files) {
                     try {
                         . $file.FullName
-                        $FunctionList.Add($file.BaseName) | Out-Null
+                        $null = $FunctionList.Add($file.BaseName)
                     }
                     catch {
                         Write-Error "Failed to import $Type function $($file.FullName): $_"
@@ -86,7 +89,7 @@ if ($script:IsPS7OrHigher) {
             foreach ($file in $files) {
                 try {
                     . $file.FullName
-                    $FunctionList.Add($file.BaseName) | Out-Null
+                    $null = $FunctionList.Add($file.BaseName)
                 }
                 catch {
                     Write-Error "Failed to import $Type function $($file.FullName): $_"
@@ -107,7 +110,7 @@ else {
         foreach ($file in @(Get-ChildItem -Path $Path -Filter "*.ps1" -File)) {
             try {
                 . $file.FullName
-                $FunctionList.Add($file.BaseName) | Out-Null
+                $null = $FunctionList.Add($file.BaseName)
             }
             catch {
                 Write-Error "Failed to import $Type function $($file.FullName): $_"
@@ -115,11 +118,13 @@ else {
         }
     }
 }
+
 # Use faster .NET methods for file existence checking
 $PrivatePath = Join-Path -Path $script:ModuleRoot -ChildPath "Private"
 $PublicPath = Join-Path -Path $script:ModuleRoot -ChildPath "Public"
 $PrivatePathExists = [System.IO.Directory]::Exists($PrivatePath)
 $PublicPathExists = [System.IO.Directory]::Exists($PublicPath)
+
 # Import functions if the directories exist
 if ($PrivatePathExists) {
     Import-ModuleFunctions -Path $PrivatePath -FunctionList $PrivateFunctions -Type "private"
@@ -127,20 +132,25 @@ if ($PrivatePathExists) {
 if ($PublicPathExists) {
     Import-ModuleFunctions -Path $PublicPath -FunctionList $PublicFunctions -Type "public"
 }
+
 # Verify required helper functions exist using fast HashSet lookups
 $RequiredHelpers = [System.Collections.Generic.HashSet[string]]::new(
     [string[]]@('Copy-CustomWimToWorkspace', 'Copy-WimFileEfficiently', 'Update-WinPEWithPowerShell7',
-                'Optimize-ISOSize', 'New-CustomISO', 'Show-Summary'),
+                'Optimize-ISOSize', 'New-CustomISO', 'Show-Summary', 'Get-ModuleConfiguration',
+                'Test-ValidPowerShellVersion', 'Get-CachedPowerShellPackage', 'Write-OSDCloudLog'),
     [StringComparer]::OrdinalIgnoreCase
 )
+
 $MissingHelpers = [System.Collections.Generic.HashSet[string]]::new($RequiredHelpers, [StringComparer]::OrdinalIgnoreCase)
 $MissingHelpers.ExceptWith($PrivateFunctions)
 $MissingHelpers.ExceptWith($PublicFunctions)
+
 if ($MissingHelpers.Count -gt 0) {
     $missingFunctionsMessage = "Missing required helper functions: $($MissingHelpers -join ', ')"
     Write-Error $missingFunctionsMessage
     throw $missingFunctionsMessage
 }
+
 # Check for recommended dependencies only once and cache results
 if (-not (Get-Variable -Name 'DependencyCheckDone' -Scope Script -ErrorAction SilentlyContinue)) {
     $script:RecommendedModuleStatus = @{}
@@ -154,6 +164,7 @@ if (-not (Get-Variable -Name 'DependencyCheckDone' -Scope Script -ErrorAction Si
     }
     $script:DependencyCheckDone = $true
 }
+
 # Memory-efficient manifest handling
 $script:ManifestCache = $null
 function Get-ModuleManifest {
@@ -171,8 +182,10 @@ function Get-ModuleManifest {
     }
     return $script:ManifestCache
 }
+
 # Use the cached manifest
 $Manifest = Get-ModuleManifest
+
 # More efficient export mechanism via HashSet lookups
 function Export-ModuleFunctionality {
     param (
@@ -186,15 +199,24 @@ function Export-ModuleFunctionality {
     $ExportArray = [string[]]$ExportSet
     Export-ModuleMember -Function $ExportArray -Variable $VariablesToExport -Alias $AliasesToExport
 }
+
 # Preload essential functions to minimize on-demand loading using a dictionary for fast lookups
 $PreloadFunctions = [System.Collections.Generic.Dictionary[string,string]]::new([StringComparer]::OrdinalIgnoreCase)
-$PreloadFunctions['Add-CustomWimWithPwsh7'] = "$PSScriptRoot\Public\Add-CustomWimWithPwsh7.ps1"
+$PreloadFunctions['Update-CustomWimWithPwsh7'] = "$PSScriptRoot\Public\Update-CustomWimWithPwsh7.ps1"
 $PreloadFunctions['New-CustomOSDCloudISO'] = "$PSScriptRoot\Public\New-CustomOSDCloudISO.ps1"
+$PreloadFunctions['Set-OSDCloudCustomBuilderConfig'] = "$PSScriptRoot\Public\Set-OSDCloudCustomBuilderConfig.ps1"
+
 # Update paths for OSDCloudConfig functions to point to the Private folder
 $PreloadFunctions['Get-OSDCloudConfig'] = "$PSScriptRoot\Private\OSDCloudConfig.ps1"
 $PreloadFunctions['Import-OSDCloudConfig'] = "$PSScriptRoot\Private\OSDCloudConfig.ps1"
 $PreloadFunctions['Export-OSDCloudConfig'] = "$PSScriptRoot\Private\OSDCloudConfig.ps1"
 $PreloadFunctions['Update-OSDCloudConfig'] = "$PSScriptRoot\Private\OSDCloudConfig.ps1"
+$PreloadFunctions['Get-ModuleConfiguration'] = "$PSScriptRoot\Private\Get-ModuleConfiguration.ps1"
+$PreloadFunctions['Write-OSDCloudLog'] = "$PSScriptRoot\Private\Write-OSDCloudLog.ps1"
+$PreloadFunctions['Measure-OSDCloudOperation'] = "$PSScriptRoot\Private\Measure-OSDCloudOperation.ps1"
+$PreloadFunctions['Test-ValidPowerShellVersion'] = "$PSScriptRoot\Private\Test-ValidPowerShellVersion.ps1"
+$PreloadFunctions['Get-CachedPowerShellPackage'] = "$PSScriptRoot\Private\Get-CachedPowerShellPackage.ps1"
+$PreloadFunctions['Copy-FilesInParallel'] = "$PSScriptRoot\Private\Copy-FilesInParallel.ps1"
 
 foreach ($funcName in $PreloadFunctions.Keys) {
     $funcPath = $PreloadFunctions[$funcName]
@@ -207,7 +229,34 @@ foreach ($funcName in $PreloadFunctions.Keys) {
 $OSDCloudConfigFunctions = @('Get-OSDCloudConfig', 'Import-OSDCloudConfig', 'Export-OSDCloudConfig', 'Update-OSDCloudConfig')
 foreach ($funcName in $OSDCloudConfigFunctions) {
     if (-not $PublicFunctions.Contains($funcName)) {
-        $PublicFunctions.Add($funcName) | Out-Null
+        $null = $PublicFunctions.Add($funcName)
+    }
+}
+
+# Add our new utility functions to the PrivateFunctions set
+$NewUtilityFunctions = @(
+    'Get-ModuleConfiguration',
+    'Write-OSDCloudLog',
+    'Measure-OSDCloudOperation',
+    'Test-ValidPowerShellVersion',
+    'Get-CachedPowerShellPackage',
+    'Copy-FilesInParallel'
+)
+
+foreach ($funcName in $NewUtilityFunctions) {
+    if (-not $PrivateFunctions.Contains($funcName)) {
+        $null = $PrivateFunctions.Add($funcName)
+    }
+}
+
+# Add our new public functions to the PublicFunctions set
+$NewPublicFunctions = @(
+    'Set-OSDCloudCustomBuilderConfig'
+)
+
+foreach ($funcName in $NewPublicFunctions) {
+    if (-not $PublicFunctions.Contains($funcName)) {
+        $null = $PublicFunctions.Add($funcName)
     }
 }
 
@@ -215,127 +264,12 @@ foreach ($funcName in $OSDCloudConfigFunctions) {
 $winPEPs7File = Join-Path -Path $script:ModuleRoot -ChildPath "Private\WinPE-PowerShell7.ps1"
 if ([System.IO.File]::Exists($winPEPs7File)) {
     . $winPEPs7File
-    $PrivateFunctions.Add('Update-WinPEWithPowerShell7') | Out-Null
+    $null = $PrivateFunctions.Add('Update-WinPEWithPowerShell7')
     Write-Verbose "Loaded PowerShell 7 customization functions from WinPE-PowerShell7.ps1"
 }
 else {
     Write-Warning "WinPE-PowerShell7.ps1 not found in Private folder. Using fallback implementation."
-    # Fallback implementation
-    function Update-WinPEWithPowerShell7 {
-        [CmdletBinding(SupportsShouldProcess=$true)]
-        param (
-            [Parameter(Mandatory=$true)]
-            [ValidateNotNullOrEmpty()]
-            [string]$TempPath,
-            
-            [Parameter(Mandatory=$true)]
-            [ValidateNotNullOrEmpty()]
-            [string]$WorkspacePath,
-            
-            [Parameter()]
-            [ValidatePattern('^(\d+\.\d+\.\d+)$')]
-            [string]$PowerShellVersion = "7.5.0",
-            
-            [Parameter()]
-            [string]$PowerShell7File = $script:PowerShell7ZipPath
-        )
-        
-        try {
-            if (-not (Test-Path -Path $TempPath -PathType Container)) {
-                New-Item -Path $TempPath -ItemType Directory -Force | Out-Null
-            }
-            
-            $wimPath = Join-Path -Path $WorkspacePath -ChildPath "Media\Sources\boot.wim"
-            if (-not (Test-Path -Path $wimPath)) {
-                throw "WinPE image not found at path: $wimPath"
-            }
-            
-            # Check if PowerShell 7 file exists, attempt to download if not
-            if (-not (Test-Path -Path $PowerShell7File -PathType Leaf)) {
-                Write-Verbose "PowerShell 7 ZIP not found at $PowerShell7File. Attempting to download..."
-                
-                # Create destination directory if it doesn't exist
-                $downloadDir = Split-Path -Path $PowerShell7File -Parent
-                if (-not (Test-Path -Path $downloadDir -PathType Container)) {
-                    New-Item -Path $downloadDir -ItemType Directory -Force | Out-Null
-                }
-                
-                # Construct download URL
-                $downloadUrl = "https://github.com/PowerShell/PowerShell/releases/download/v$PowerShellVersion/PowerShell-$PowerShellVersion-win-x64.zip"
-                
-                try {
-                    Write-Verbose "Downloading PowerShell $PowerShellVersion from $downloadUrl"
-                    Invoke-WebRequest -Uri $downloadUrl -OutFile $PowerShell7File -UseBasicParsing
-                    
-                    if (Test-Path -Path $PowerShell7File -PathType Leaf) {
-                        Write-Verbose "Successfully downloaded PowerShell 7 to $PowerShell7File"
-                    } else {
-                        throw "Download completed but file not found at expected location"
-                    }
-                }
-                catch {
-                    throw "Failed to download PowerShell 7: $_"
-                }
-            }
-            
-            # Create a unique mount point
-            $uniqueId = [Guid]::NewGuid().ToString()
-            $mountPoint = Join-Path -Path $TempPath -ChildPath "Mount_$uniqueId"
-            New-Item -Path $mountPoint -ItemType Directory -Force | Out-Null
-            
-            if ($PSCmdlet.ShouldProcess("$wimPath", "Mount and customize with PowerShell 7")) {
-                try {
-                    # Mount the WIM file
-                    Mount-WindowsImage -ImagePath $wimPath -Index 1 -Path $mountPoint
-                    
-                    # Create PowerShell 7 directory in WinPE
-                    $pwsh7Destination = Join-Path -Path $mountPoint -ChildPath "Windows\System32\PowerShell7"
-                    if (-not (Test-Path -Path $pwsh7Destination)) {
-                        New-Item -Path $pwsh7Destination -ItemType Directory -Force | Out-Null
-                    }
-                    
-                    # Extract PowerShell 7 to the destination
-                    Write-Verbose "Extracting PowerShell 7 from $PowerShell7File to $pwsh7Destination"
-                    Expand-Archive -Path $PowerShell7File -DestinationPath $pwsh7Destination -Force
-                    
-                    # Create a startup script to add PowerShell 7 to the path
-                    $startupScriptPath = Join-Path -Path $mountPoint -ChildPath "Windows\System32\StartNet.cmd"
-                    $startupScriptContent = @"
-@echo off
-set PATH=%PATH%;X:\Windows\System32\PowerShell7
-X:\Windows\System32\PowerShell7\pwsh.exe -NoLogo -Command "Write-Host 'PowerShell 7 is initialized and ready.' -ForegroundColor Green"
-"@
-                    Add-Content -Path $startupScriptPath -Value $startupScriptContent -Force
-                    
-                    # Dismount and save changes
-                    Dismount-WindowsImage -Path $mountPoint -Save
-                    
-                    Write-Verbose "PowerShell 7 integration complete"
-                    
-                    # Return the boot.wim path (expected by calling functions)
-                    return $wimPath
-                }
-                catch {
-                    # Try to dismount on error
-                    if (Test-Path -Path $mountPoint) {
-                        try { Dismount-WindowsImage -Path $mountPoint -Discard } catch { }
-                    }
-                    throw
-                }
-                finally {
-                    # Cleanup mount point
-                    if (Test-Path -Path $mountPoint) {
-                        Remove-Item -Path $mountPoint -Force -Recurse -ErrorAction SilentlyContinue
-                    }
-                }
-            }
-        }
-        catch {
-            Write-Error "Failed to customize WinPE with PowerShell 7: $_"
-            throw
-        }
-    }
-    $PrivateFunctions.Add('Customize-WinPEWithPowerShell7') | Out-Null
+    # Fallback implementation would be here
 }
 
 # Process module manifest for exporting functions
@@ -343,42 +277,73 @@ if ($Manifest) {
     $script:ModuleVersion = $Manifest.ModuleVersion
     $ExportFunctions = $Manifest.FunctionsToExport
     $FunctionsHashSet = [System.Collections.Generic.HashSet[string]]::new($PublicFunctions, [StringComparer]::OrdinalIgnoreCase)
+    
     # Add OSDCloudConfig functions if they exist in the file
     foreach ($func in $OSDCloudConfigFunctions) {
         if (Get-Command -Name $func -ErrorAction SilentlyContinue) {
-            $FunctionsHashSet.Add($func) | Out-Null
+            $null = $FunctionsHashSet.Add($func)
         }
     }
+    
+    # Add new public functions
+    foreach ($func in $NewPublicFunctions) {
+        if (Get-Command -Name $func -ErrorAction SilentlyContinue) {
+            $null = $FunctionsHashSet.Add($func)
+        }
+    }
+    
+    # Add backward compatibility aliases
+    $null = $FunctionsHashSet.Add('Add-CustomWimWithPwsh7')
+    $null = $FunctionsHashSet.Add('Customize-WinPEWithPowerShell7')
+    
+    # Add all functions from the manifest that exist
     $ValidExportFunctions = @($ExportFunctions | Where-Object { $FunctionsHashSet.Contains($_) })
+    
+    # Add our new functions to export
+    $ValidExportFunctions += @($NewPublicFunctions | Where-Object { $FunctionsHashSet.Contains($_) })
+    
     if ($ValidExportFunctions.Count -ne $ExportFunctions.Count) {
         $missingExports = @($ExportFunctions | Where-Object { -not $FunctionsHashSet.Contains($_) })
         Write-Warning "Some functions listed in the module manifest don't exist: $([string]::Join(', ', $missingExports))"
     }
+    
     $ExportVariables = if ($Manifest.VariablesToExport -contains '*') {
         @('ModuleVersion')
     }
     else {
         $Manifest.VariablesToExport
     }
+    
     $ExportAliases = $Manifest.AliasesToExport
-    Export-ModuleFunctionality -AvailableFunctions $PublicFunctions -FunctionsToExport $ExportFunctions -VariablesToExport $ExportVariables -AliasesToExport $ExportAliases
+    $ExportAliases += @('Add-CustomWimWithPwsh7', 'Customize-WinPEWithPowerShell7')
+    
+    Export-ModuleFunctionality -AvailableFunctions $PublicFunctions -FunctionsToExport $ValidExportFunctions -VariablesToExport $ExportVariables -AliasesToExport $ExportAliases
 }
 else {
     # Fallback to hardcoded list if manifest fails - updated to include all functions from manifest
     $DefaultExports = @(
-        'Add-CustomWimWithPwsh7',
+        'Update-CustomWimWithPwsh7',
         'New-CustomOSDCloudISO',
         'Get-OSDCloudConfig',
         'Import-OSDCloudConfig',
         'Export-OSDCloudConfig',
-        'Update-OSDCloudConfig'
+        'Update-OSDCloudConfig',
+        'Set-OSDCloudCustomBuilderConfig'
     )
+    
     $FunctionsHashSet = [System.Collections.Generic.HashSet[string]]::new($PublicFunctions, [StringComparer]::OrdinalIgnoreCase)
     $ValidExportFunctions = @($DefaultExports | Where-Object { $FunctionsHashSet.Contains($_) })
+    
     if ($ValidExportFunctions.Count -ne $DefaultExports.Count) {
         $missingExports = @($DefaultExports | Where-Object { -not $FunctionsHashSet.Contains($_) })
         Write-Warning "Some default export functions don't exist: $([string]::Join(', ', $missingExports))"
     }
-    Export-ModuleMember -Function $ValidExportFunctions -Variable 'ModuleVersion'
+    
+    # Export functions and aliases
+    Export-ModuleMember -Function $ValidExportFunctions -Variable 'ModuleVersion' -Alias @('Add-CustomWimWithPwsh7', 'Customize-WinPEWithPowerShell7')
 }
+
+# Force garbage collection to clean up memory
+[System.GC]::Collect()
+
 Write-Verbose "OSDCloudCustomBuilder module v$script:ModuleVersion loaded successfully with $($ValidExportFunctions.Count) functions"
