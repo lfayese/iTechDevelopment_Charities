@@ -102,6 +102,17 @@ $script:OSDCloudConfig = @{
     MaxParallelTasks = 4
     UseRobocopyForLargeFiles = $true
     LargeFileSizeThresholdMB = 100
+    
+    # Schema version for configuration compatibility
+    SchemaVersion = "1.0"
+    
+    # Metadata fields for tracking
+    LastModified = (Get-Date).ToString('o')
+    ModifiedBy = $env:USERNAME
+    ChangeHistory = @()
+    
+    # Active configuration profile
+    ActiveProfile = "Default"
 }
 
 <#
@@ -187,7 +198,7 @@ function Test-OSDCloudConfig {
             foreach ($field in $booleanFields) {
                 if ($Config.ContainsKey($field) -and $Config[$field] -isnot [bool]) {
                     $isValid = $false
-                    $validationErrors += "Invalid value for $field: must be a boolean (true/false)"
+                    $validationErrors += "Invalid value for $($field): must be a boolean (true/false)"
                 }
             }
             
@@ -280,14 +291,14 @@ function Import-OSDCloudConfig {
                 $errorMessage = "Invalid configuration loaded from $Path"
                 if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
                     Invoke-OSDCloudLogger -Message $errorMessage -Level Warning -Component "Import-OSDCloudConfig"
-                    foreach ($error in $validation.Errors) {
-                        Invoke-OSDCloudLogger -Message $error -Level Warning -Component "Import-OSDCloudConfig"
+                    foreach ($validationError in $validation.Errors) {
+                        Invoke-OSDCloudLogger -Message $validationError -Level Warning -Component "Import-OSDCloudConfig"
                     }
                 }
                 else {
                     Write-Warning $errorMessage
-                    foreach ($error in $validation.Errors) {
-                        Write-Warning $error
+                    foreach ($validationError in $validation.Errors) {
+                        Write-Warning $validationError
                     }
                 }
                 return $false
@@ -364,14 +375,14 @@ function Export-OSDCloudConfig {
                 $errorMessage = "Cannot save invalid configuration to $Path"
                 if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
                     Invoke-OSDCloudLogger -Message $errorMessage -Level Error -Component "Export-OSDCloudConfig"
-                    foreach ($error in $validation.Errors) {
-                        Invoke-OSDCloudLogger -Message $error -Level Error -Component "Export-OSDCloudConfig"
+                    foreach ($validationError in $validation.Errors) {
+                        Invoke-OSDCloudLogger -Message $validationError -Level Error -Component "Export-OSDCloudConfig"
                     }
                 }
                 else {
                     Write-Error $errorMessage
-                    foreach ($error in $validation.Errors) {
-                        Write-Error $error
+                    foreach ($validationError in $validation.Errors) {
+                        Write-Error $validationError
                     }
                 }
                 return $false
@@ -598,14 +609,14 @@ function Update-OSDCloudConfig {
                 $errorMessage = "Invalid configuration settings"
                 if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
                     Invoke-OSDCloudLogger -Message $errorMessage -Level Error -Component "Update-OSDCloudConfig"
-                    foreach ($error in $validation.Errors) {
-                        Invoke-OSDCloudLogger -Message $error -Level Error -Component "Update-OSDCloudConfig"
+                    foreach ($validationError in $validation.Errors) {
+                        Invoke-OSDCloudLogger -Message $validationError -Level Error -Component "Update-OSDCloudConfig"
                     }
                 }
                 else {
                     Write-Error $errorMessage
-                    foreach ($error in $validation.Errors) {
-                        Write-Error $error
+                    foreach ($validationError in $validation.Errors) {
+                        Write-Error $validationError
                     }
                 }
                 return $false
@@ -644,6 +655,754 @@ function Update-OSDCloudConfig {
     }
 }
 
+<#
+.SYNOPSIS
+    Expands environment variables in string values.
+.DESCRIPTION
+    Processes a string and expands any environment variables into their actual values.
+    This allows for dynamic paths and configurations based on system environment.
+.PARAMETER Value
+    The string value containing environment variables to expand.
+.EXAMPLE
+    Expand-EnvironmentVariables -Value "%TEMP%\Logs"
+    Returns the expanded path with %TEMP% replaced by the actual temp directory.
+.NOTES
+    Environment variables should be in the format %VARIABLENAME% or $env:VARIABLENAME.
+#>
+function Expand-EnvironmentVariables {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [string]$Value
+    )
+    
+    process {
+        return [Environment]::ExpandEnvironmentVariables($Value)
+    }
+}
+
+<#
+.SYNOPSIS
+    Processes all path-based configuration values and expands environment variables.
+.DESCRIPTION
+    Iterates through a configuration hashtable and expands environment variables in all path-related settings.
+    This allows for dynamic paths that can adapt to different environments.
+.PARAMETER Config
+    The configuration hashtable to process.
+.EXAMPLE
+    $config = Expand-ConfigPaths -Config $OSDCloudConfig
+.NOTES
+    This function is used internally by the configuration management system.
+#>
+function Expand-ConfigPaths {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [hashtable]$Config
+    )
+    
+    # List of keys containing paths that should support env variables
+    $pathKeys = @(
+        'LogFilePath', 
+        'ErrorLogPath', 
+        'ISOOutputPath', 
+        'TempWorkspacePath', 
+        'SharedConfigPath'
+    )
+    
+    foreach ($key in $pathKeys) {
+        if ($Config.ContainsKey($key) -and -not [string]::IsNullOrEmpty($Config[$key])) {
+            $Config[$key] = Expand-EnvironmentVariables -Value $Config[$key]
+        }
+    }
+    
+    return $Config
+}
+
+<#
+.SYNOPSIS
+    Protects sensitive configuration values through encryption.
+.DESCRIPTION
+    Encrypts sensitive configuration values to protect them when stored on disk.
+    The encryption is Windows user account specific.
+.PARAMETER Value
+    The sensitive string value to encrypt.
+.EXAMPLE
+    $encryptedValue = Protect-ConfigValue -Value "p@ssw0rd"
+.NOTES
+    This function uses Windows Data Protection API (DPAPI) for encryption.
+#>
+function Protect-ConfigValue {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Value
+    )
+    
+    # Convert string to secure string and then to encrypted standard string
+    $secureString = ConvertTo-SecureString -String $Value -AsPlainText -Force
+    $encrypted = ConvertFrom-SecureString -SecureString $secureString
+    
+    return $encrypted
+}
+
+<#
+.SYNOPSIS
+    Decrypts protected configuration values.
+.DESCRIPTION
+    Decrypts previously encrypted configuration values to make them usable in the application.
+    The decryption can only be performed by the same Windows user account that encrypted the value.
+.PARAMETER EncryptedValue
+    The encrypted string value to decrypt.
+.EXAMPLE
+    $plainText = Unprotect-ConfigValue -EncryptedValue $encryptedPassword
+.NOTES
+    This function uses Windows Data Protection API (DPAPI) for decryption.
+#>
+function Unprotect-ConfigValue {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$EncryptedValue
+    )
+    
+    try {
+        # Convert encrypted string back to secure string
+        $secureString = ConvertTo-SecureString -String $EncryptedValue
+        
+        # Extract plain text
+        $BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureString)
+        $plainText = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
+        [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($BSTR)
+        
+        return $plainText
+    }
+    catch {
+        Write-Warning "Failed to decrypt value: $_"
+        return $null
+    }
+}
+
+<#
+.SYNOPSIS
+    Exports a secure version of OSDCloud configuration with sensitive values encrypted.
+.DESCRIPTION
+    Creates and saves a secure version of the OSDCloud configuration with sensitive values encrypted.
+    This allows storing configurations with API keys, credentials, etc. in shared locations.
+.PARAMETER Path
+    The path where the JSON configuration file will be saved.
+.PARAMETER Config
+    A hashtable containing the configuration settings to save. If not specified, the current configuration is used.
+.PARAMETER SensitiveKeys
+    An array of key names that should be considered sensitive and encrypted.
+.EXAMPLE
+    Export-SecureOSDCloudConfig -Path "C:\OSDCloud\secure-config.json"
+.EXAMPLE
+    Export-SecureOSDCloudConfig -Path "C:\OSDCloud\secure-config.json" -SensitiveKeys @('ApiKey', 'Password')
+.NOTES
+    The encryption is tied to the Windows user account performing the encryption.
+#>
+function Export-SecureOSDCloudConfig {
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        
+        [Parameter(Mandatory = $false)]
+        [hashtable]$Config = $script:OSDCloudConfig,
+        
+        [Parameter(Mandatory = $false)]
+        [string[]]$SensitiveKeys = @('OrganizationEmail', 'ApiKeys', 'Credentials')
+    )
+    
+    # Clone the config to avoid modifying the original
+    $secureConfig = @{}
+    foreach ($key in $Config.Keys) {
+        if ($Config[$key] -is [hashtable]) {
+            $secureConfig[$key] = $Config[$key].Clone()
+        }
+        elseif ($Config[$key] -is [array]) {
+            $secureConfig[$key] = $Config[$key].Clone()
+        }
+        else {
+            $secureConfig[$key] = $Config[$key]
+        }
+    }
+    
+    # Encrypt sensitive values
+    foreach ($key in $SensitiveKeys) {
+        if ($secureConfig.ContainsKey($key) -and -not [string]::IsNullOrEmpty($secureConfig[$key])) {
+            $secureConfig[$key] = Protect-ConfigValue -Value $secureConfig[$key]
+        }
+    }
+    
+    # Mark the config as having sensitive data
+    $secureConfig['ContainsSensitiveData'] = $true
+    
+    # Save the secure config
+    if ($PSCmdlet.ShouldProcess($Path, "Save secure configuration")) {
+        # Create directory if it doesn't exist
+        $directory = Split-Path -Path $Path -Parent
+        if (-not (Test-Path $directory)) {
+            New-Item -Path $directory -ItemType Directory -Force -ErrorAction Stop | Out-Null
+        }
+        
+        $secureConfig | ConvertTo-Json -Depth 5 | Set-Content -Path $Path -Force
+        
+        $message = "Secure configuration exported to $Path"
+        if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+            Invoke-OSDCloudLogger -Message $message -Level Info -Component "Export-SecureOSDCloudConfig"
+        }
+        else {
+            Write-Verbose $message
+        }
+        
+        return $true
+    }
+    
+    return $false
+}
+
+<#
+.SYNOPSIS
+    Imports a secure OSDCloud configuration with encrypted sensitive values.
+.DESCRIPTION
+    Loads a secure OSDCloud configuration and decrypts sensitive values.
+    This allows using configurations with API keys, credentials, etc. from shared locations.
+.PARAMETER Path
+    The path to the secure JSON configuration file.
+.PARAMETER SensitiveKeys
+    An array of key names that should be considered sensitive and need decryption.
+.EXAMPLE
+    Import-SecureOSDCloudConfig -Path "C:\OSDCloud\secure-config.json"
+.NOTES
+    The decryption can only be performed by the same Windows user account that encrypted the values.
+#>
+function Import-SecureOSDCloudConfig {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        
+        [Parameter(Mandatory = $false)]
+        [string[]]$SensitiveKeys = @('OrganizationEmail', 'ApiKeys', 'Credentials')
+    )
+    
+    try {
+        if (-not (Test-Path $Path)) {
+            $errorMessage = "Secure configuration file not found: $Path"
+            if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+                Invoke-OSDCloudLogger -Message $errorMessage -Level Warning -Component "Import-SecureOSDCloudConfig"
+            }
+            else {
+                Write-Warning $errorMessage
+            }
+            return $false
+        }
+        
+        $configJson = Get-Content -Path $Path -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+        $config = @{}
+        
+        # Convert JSON to hashtable
+        $configJson.PSObject.Properties | ForEach-Object {
+            $config[$_.Name] = $_.Value
+        }
+        
+        # Check if this is a secure config
+        if (-not $config.ContainsKey('ContainsSensitiveData') -or -not $config['ContainsSensitiveData']) {
+            Write-Warning "The configuration at $Path is not marked as containing sensitive data"
+        }
+        else {
+            # Decrypt sensitive values
+            foreach ($key in $SensitiveKeys) {
+                if ($config.ContainsKey($key) -and -not [string]::IsNullOrEmpty($config[$key])) {
+                    $config[$key] = Unprotect-ConfigValue -EncryptedValue $config[$key]
+                    
+                    # If decryption failed, log a warning but continue
+                    if ($null -eq $config[$key]) {
+                        $warningMessage = "Failed to decrypt sensitive value for $key"
+                        if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+                            Invoke-OSDCloudLogger -Message $warningMessage -Level Warning -Component "Import-SecureOSDCloudConfig"
+                        }
+                        else {
+                            Write-Warning $warningMessage
+                        }
+                    }
+                }
+            }
+            
+            # Remove the marker as we've decrypted the values
+            $config.Remove('ContainsSensitiveData')
+        }
+        
+        # Validate and merge
+        $validation = Test-OSDCloudConfig -Config $config
+        if (-not $validation.IsValid) {
+            $errorMessage = "Invalid secure configuration loaded from $Path"
+            if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+                Invoke-OSDCloudLogger -Message $errorMessage -Level Warning -Component "Import-SecureOSDCloudConfig"
+                foreach ($validationError in $validation.Errors) {
+                    Invoke-OSDCloudLogger -Message $validationError -Level Warning -Component "Import-SecureOSDCloudConfig"
+                }
+            }
+            else {
+                Write-Warning $errorMessage
+                foreach ($validationError in $validation.Errors) {
+                    Write-Warning $validationError
+                }
+            }
+            return $false
+        }
+        
+        # Merge with default configuration
+        $script:OSDCloudConfig = Merge-OSDCloudConfig -UserConfig $config
+        
+        $successMessage = "Secure configuration successfully loaded from $Path"
+        if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+            Invoke-OSDCloudLogger -Message $successMessage -Level Info -Component "Import-SecureOSDCloudConfig"
+        }
+        else {
+            Write-Verbose $successMessage
+        }
+        
+        return $true
+    }
+    catch {
+        $errorMessage = "Error loading secure configuration from $Path`: $_"
+        if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+            Invoke-OSDCloudLogger -Message $errorMessage -Level Error -Component "Import-SecureOSDCloudConfig" -Exception $_.Exception
+        }
+        else {
+            Write-Warning $errorMessage
+        }
+        return $false
+    }
+}
+
+<#
+.SYNOPSIS
+    Tests the compatibility of a configuration schema version.
+.DESCRIPTION
+    Validates that a configuration schema version is compatible with the current module version.
+    Warns if the schema is older than the minimum supported version or newer than the current version.
+.PARAMETER Version
+    The schema version to test.
+.PARAMETER MinimumVersion
+    The minimum supported schema version.
+.PARAMETER CurrentVersion
+    The current schema version of the module.
+.EXAMPLE
+    Test-SchemaVersion -Version "1.2" -MinimumVersion "1.0"
+.NOTES
+    Schema versions use semantic versioning: Major.Minor format.
+#>
+function Test-SchemaVersion {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Version,
+        
+        [Parameter(Mandatory = $false)]
+        [string]$MinimumVersion = "1.0",
+        
+        [Parameter(Mandatory = $false)]
+        [string]$CurrentVersion = $script:OSDCloudConfig.SchemaVersion
+    )
+    
+    try {
+        $versionObj = [Version]$Version
+        $minVersionObj = [Version]$MinimumVersion
+        $currentVersionObj = [Version]$CurrentVersion
+        
+        if ($versionObj -lt $minVersionObj) {
+            Write-Warning "Configuration schema version $Version is older than minimum supported version $MinimumVersion"
+            return $false
+        }
+        
+        if ($versionObj -gt $currentVersionObj) {
+            Write-Warning "Configuration schema version $Version is newer than current module version $CurrentVersion. Some settings may be ignored."
+        }
+        
+        return $true
+    }
+    catch {
+        Write-Warning "Invalid schema version format: $Version. Expected format: Major.Minor"
+        return $false
+    }
+}
+
+# Initialize validation cache
+$script:ValidationCache = @{}
+
+<#
+.SYNOPSIS
+    Tracks changes made to the configuration.
+.DESCRIPTION
+    Records changes made to the configuration with metadata about when, by whom, and what was changed.
+    Maintains a history of recent changes for auditing and rollback purposes.
+.PARAMETER Config
+    The configuration hashtable to update with change history.
+.PARAMETER ChangedSettings
+    A hashtable containing the settings that were changed.
+.PARAMETER Reason
+    A description of why the changes were made.
+.PARAMETER MaxHistoryItems
+    The maximum number of history entries to maintain.
+.EXAMPLE
+    Add-ConfigChangeRecord -Config $config -ChangedSettings @{LogLevel = "Debug"} -Reason "Troubleshooting"
+.NOTES
+    This function is used internally by the configuration management system.
+#>
+function Add-ConfigChangeRecord {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [hashtable]$Config,
+        
+        [Parameter(Mandatory = $true)]
+        [hashtable]$ChangedSettings,
+        
+        [Parameter(Mandatory = $false)]
+        [string]$Reason = "",
+        
+        [Parameter(Mandatory = $false)]
+        [int]$MaxHistoryItems = 10
+    )
+    
+    # Create change record
+    $changeRecord = @{
+        Timestamp = (Get-Date).ToString('o')
+        User = $env:USERNAME
+        ChangedKeys = $ChangedSettings.Keys -join ", "
+        Reason = $Reason
+    }
+    
+    # Initialize history if it doesn't exist
+    if (-not $Config.ContainsKey('ChangeHistory')) {
+        $Config['ChangeHistory'] = @()
+    }
+    
+    # Add change record to history
+    $Config['ChangeHistory'] = @($changeRecord) + $Config['ChangeHistory']
+    
+    # Trim history if needed
+    if ($Config['ChangeHistory'].Count -gt $MaxHistoryItems) {
+        $Config['ChangeHistory'] = $Config['ChangeHistory'][0..($MaxHistoryItems-1)]
+    }
+    
+    # Update metadata
+    $Config['LastModified'] = (Get-Date).ToString('o')
+    $Config['ModifiedBy'] = $env:USERNAME
+    
+    return $Config
+}
+
+# Define configuration profiles
+$script:ConfigProfiles = @{
+    'Default' = $script:OSDCloudConfig.Clone()
+    'Debug' = @{
+        LogLevel = 'Debug'
+        VerboseLogging = $true
+        DebugLogging = $true
+    }
+    'Performance' = @{
+        EnableParallelProcessing = $true
+        MaxParallelTasks = 8
+        UseRobocopyForLargeFiles = $true
+        LargeFileSizeThresholdMB = 50
+    }
+    'Minimal' = @{
+        CleanupTempFiles = $true
+        OptimizeISOSize = $true
+        CreateBackups = $false
+    }
+}
+
+<#
+.SYNOPSIS
+    Applies a predefined configuration profile.
+.DESCRIPTION
+    Sets the OSDCloud configuration to match a predefined profile.
+    Profiles can be either applied as a complete replacement or merged with the current settings.
+.PARAMETER ProfileName
+    The name of the profile to apply.
+.PARAMETER Merge
+    If specified, the profile will be merged with current settings rather than replacing them entirely.
+.EXAMPLE
+    Set-OSDCloudConfigProfile -ProfileName "Debug"
+.EXAMPLE
+    Set-OSDCloudConfigProfile -ProfileName "Performance" -Merge
+.NOTES
+    Available profiles include: Default, Debug, Performance, and Minimal.
+#>
+function Set-OSDCloudConfigProfile {
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('Default', 'Debug', 'Performance', 'Minimal')]
+        [string]$ProfileName,
+        
+        [Parameter(Mandatory = $false)]
+        [switch]$Merge
+    )
+    
+    if (-not $script:ConfigProfiles.ContainsKey($ProfileName)) {
+        Write-Error "Profile '$ProfileName' not found"
+        return $false
+    }
+    
+    if ($PSCmdlet.ShouldProcess("OSDCloud Configuration", "Apply profile '$ProfileName'")) {
+        $configProfileSettings = $script:ConfigProfiles[$ProfileName]
+        
+        if ($Merge) {
+            Update-OSDCloudConfig -Settings $configProfileSettings -ChangeReason "Applied profile: $ProfileName (merged)"
+        }
+        else {
+            if ($ProfileName -eq 'Default') {
+                $script:OSDCloudConfig = $script:ConfigProfiles['Default'].Clone()
+            }
+            else {
+                # Start with default and apply profile settings
+                $newConfig = $script:ConfigProfiles['Default'].Clone()
+                foreach ($key in $configProfileSettings.Keys) {
+                    $newConfig[$key] = $configProfileSettings[$key]
+                }
+                $script:OSDCloudConfig = $newConfig
+            }
+            
+            # Update metadata
+            $script:OSDCloudConfig['LastModified'] = (Get-Date).ToString('o')
+            $script:OSDCloudConfig['ModifiedBy'] = $env:USERNAME
+            $script:OSDCloudConfig['ActiveProfile'] = $ProfileName
+            
+            # Add a change record
+            $changeRecord = @{
+                Timestamp = (Get-Date).ToString('o')
+                User = $env:USERNAME
+                ChangedKeys = "Applied full profile"
+                Reason = "Applied profile: $ProfileName (full replacement)"
+            }
+            
+            if (-not $script:OSDCloudConfig.ContainsKey('ChangeHistory')) {
+                $script:OSDCloudConfig['ChangeHistory'] = @()
+            }
+            
+            $script:OSDCloudConfig['ChangeHistory'] = @($changeRecord) + $script:OSDCloudConfig['ChangeHistory']
+        }
+        
+        # Log the profile application
+        $message = "Applied configuration profile: $ProfileName (Merge: $($Merge.IsPresent))"
+        if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+            Invoke-OSDCloudLogger -Message $message -Level Info -Component "Set-OSDCloudConfigProfile"
+        }
+        else {
+            Write-Verbose $message
+        }
+        
+        return $true
+    }
+    
+    return $false
+}
+
+# At module startup, cache whether the logger command exists.
+if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+    $script:LoggerExists = $true
+}
+else {
+    $script:LoggerExists = $false
+}
+# Example: Revised Add-PerformanceLogEntry function
+function Add-PerformanceLogEntry {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$OperationName,
+        [Parameter(Mandatory = $true)]
+        [int]$DurationMs,
+        [Parameter(Mandatory = $true)]
+        [ValidateSet("Success", "Warning", "Failure")]
+        [string]$Outcome,
+        [Parameter(Mandatory = $false)]
+        [hashtable]$ResourceUsage = @{},
+        [Parameter(Mandatory = $false)]
+        [hashtable]$AdditionalData = @{}
+    )
+    # Create performance log entry as a hashtable
+    $entry = @{
+        Timestamp      = (Get-Date).ToString('o')
+        Operation      = $OperationName
+        DurationMs     = $DurationMs
+        Outcome        = $Outcome
+        ResourceUsage  = $ResourceUsage
+        AdditionalData = $AdditionalData
+    }
+    
+    # Determine the performance log file path
+    $perfLogPath = Join-Path -Path (Split-Path $script:OSDCloudConfig.LogFilePath -Parent) -ChildPath "PerformanceMetrics.log"
+    try {
+        # Convert the entry to JSON (one-line, NDJSON style)
+        $entryJson = $entry | ConvertTo-Json -Depth 4
+        # Append the JSON entry to the log file
+        Add-Content -Path $perfLogPath -Value $entryJson
+        return $true
+    }
+    catch {
+        Write-Warning "Failed to log performance metrics: $_"
+        return $false
+    }
+}
+# In functions logging messages, use the cached variable instead of calling Get-Command repeatedly.
+# For example, in Import-OSDCloudConfig you can change:
+#
+#    if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+#        Invoke-OSDCloudLogger -Message "Importing configuration from $Path" -Level Info -Component "Import-OSDCloudConfig"
+#    }
+#
+# to:
+#
+#    if ($script:LoggerExists) {
+#        Invoke-OSDCloudLogger -Message "Importing configuration from $Path" -Level Info -Component "Import-OSDCloudConfig"
+#    }
+<#
+.SYNOPSIS
+    Measures and logs the performance of a script block.
+.DESCRIPTION
+    Executes a script block while measuring its duration and resource utilization,
+    then logs the performance metrics for analysis.
+.PARAMETER Name
+    The name of the operation being measured.
+.PARAMETER ScriptBlock
+    The script block to execute and measure.
+.EXAMPLE
+    Measure-OSDCloudOperation -Name "ExportConfiguration" -ScriptBlock { Export-OSDCloudConfig -Path "C:\config.json" }
+#>
+function Measure-OSDCloudOperation {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name,
+        
+        [Parameter(Mandatory = $true)]
+        [scriptblock]$ScriptBlock
+    )
+    
+    # Get starting process info
+    $processStart = Get-Process -Id $PID
+    $startMemory = $processStart.WorkingSet64
+    $startCpu = $processStart.CPU
+    
+    # Measure execution time
+    $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+    
+    try {
+        # Execute the script block
+        $result = & $ScriptBlock
+        $outcome = "Success"
+    }
+    catch {
+        $result = $null
+        $outcome = "Failure"
+        throw
+    }
+    finally {
+        # Stop timing
+        $stopwatch.Stop()
+        $durationMs = $stopwatch.ElapsedMilliseconds
+        
+        # Get ending process info
+        $processEnd = Get-Process -Id $PID
+        $endMemory = $processEnd.WorkingSet64
+        $endCpu = $processEnd.CPU
+        
+        # Calculate resource usage
+        $resourceUsage = @{
+            MemoryDeltaKB = [Math]::Round(($endMemory - $startMemory) / 1KB, 2)
+            CPUDelta = [Math]::Round($endCpu - $startCpu, 2)
+        }
+        
+        # Log performance data
+        Add-PerformanceLogEntry -OperationName $Name -DurationMs $durationMs -Outcome $outcome -ResourceUsage $resourceUsage
+    }
+    
+    return $result
+}
+
+<#
+.SYNOPSIS
+    Rotates log files to maintain manageable sizes and history.
+.DESCRIPTION
+    Manages log files by creating backups and removing old logs
+    based on size limits and retention policies.
+.PARAMETER LogFilePath
+    The path to the log file to rotate.
+.PARAMETER MaxSizeMB
+    The maximum size in MB before rotation occurs.
+.PARAMETER MaxBackups
+    The maximum number of backup log files to keep.
+.EXAMPLE
+    Invoke-LogRotation -LogFilePath "C:\Logs\OSDCloud.log" -MaxSizeMB 10 -MaxBackups 5
+#>
+function Invoke-LogRotation {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$LogFilePath,
+        
+        [Parameter(Mandatory = $false)]
+        [int]$MaxSizeMB = 10,
+        
+        [Parameter(Mandatory = $false)]
+        [int]$MaxBackups = 5
+    )
+    
+    if (-not (Test-Path $LogFilePath)) {
+        return
+    }
+    
+    # Check if log file exceeds maximum size
+    $logFile = Get-Item $LogFilePath
+    $maxSizeBytes = $MaxSizeMB * 1MB
+    
+    if ($logFile.Length -gt $maxSizeBytes) {
+        try {
+            # Remove oldest backup if we have reached max
+            for ($i = $MaxBackups; $i -gt 1; $i--) {
+                $oldPath = "$LogFilePath.$($i-1)"
+                $newPath = "$LogFilePath.$i"
+                if (Test-Path $oldPath) {
+                    if (Test-Path $newPath) {
+                        Remove-Item $newPath -Force
+                    }
+                    Move-Item $oldPath $newPath -Force
+                }
+            }
+            
+            # Rename current log to .1
+            $backupPath = "$LogFilePath.1"
+            if (Test-Path $backupPath) {
+                Remove-Item $backupPath -Force
+            }
+            
+            # Create backup and start new log
+            Copy-Item $LogFilePath $backupPath -Force
+            Clear-Content $LogFilePath -Force
+            
+            # Write rotation message to new log
+            $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+            Add-Content -Path $LogFilePath -Value "[$timestamp] [INFO] Log file rotated. Previous log saved to $backupPath"
+            
+            return $true
+        }
+        catch {
+            Write-Warning "Failed to rotate log file: $_"
+            return $false
+        }
+    }
+    
+    return $false
+}
+
 # Look for a shared configuration file at startup
 $sharedConfigPath = Join-Path -Path $script:OSDCloudConfig.SharedConfigPath -ChildPath "OSDCloudConfig.json"
 if (Test-Path $sharedConfigPath) {
@@ -657,4 +1416,4 @@ if (Test-Path $sharedConfigPath) {
 
 # Export functions and variables
 Export-ModuleMember -Variable OSDCloudConfig
-Export-ModuleMember -Function Test-OSDCloudConfig, Import-OSDCloudConfig, Export-OSDCloudConfig, Get-OSDCloudConfig, Merge-OSDCloudConfig, Update-OSDCloudConfig
+Export-ModuleMember -Function Test-OSDCloudConfig, Import-OSDCloudConfig, Export-OSDCloudConfig, Get-OSDCloudConfig, Merge-OSDCloudConfig, Update-OSDCloudConfig, Expand-EnvironmentVariables, Expand-ConfigPaths, Protect-ConfigValue, Unprotect-ConfigValue, Export-SecureOSDCloudConfig, Import-SecureOSDCloudConfig, Test-SchemaVersion, Add-ConfigChangeRecord, Set-OSDCloudConfigProfile, Add-PerformanceLogEntry, Measure-OSDCloudOperation, Invoke-LogRotation
