@@ -1,0 +1,115 @@
+name: PowerShell Module CI/CD
+
+on:
+  push:
+    branches: [ main, master ]
+    paths-ignore:
+      - '*.md'
+      - '.gitignore'
+  pull_request:
+    branches: [ main, master ]
+    paths-ignore:
+      - '*.md'
+      - '.gitignore'
+  release:
+    types: [ created ]
+
+jobs:
+  test:
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest]
+        
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install Pester
+        shell: pwsh
+        run: |
+          Install-Module -Name Pester -Force -SkipPublisherCheck
+          Install-Module -Name PSScriptAnalyzer -Force
+          
+      - name: Run Tests
+        shell: pwsh
+        run: |
+          $config = New-PesterConfiguration
+          $config.Run.Path = "./Tests"
+          $config.Run.PassThru = $true
+          $config.CodeCoverage.Enabled = $true
+          $config.CodeCoverage.Path = @('./Public/*.ps1', './Private/*.ps1')
+          $config.CodeCoverage.OutputFormat = 'JaCoCo'
+          $config.CodeCoverage.OutputPath = './coverage.xml'
+          $config.Output.Verbosity = 'Detailed'
+          
+          $result = Invoke-Pester -Configuration $config
+          
+          if ($result.FailedCount -gt 0) {
+            throw "$($result.FailedCount) tests failed."
+          }
+      
+      - name: Upload Code Coverage Results
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          fail_ci_if_error: false
+
+  analyze:
+    name: PSScriptAnalyzer
+    runs-on: windows-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          Install-Module -Name PSScriptAnalyzer -Force
+          
+      - name: Run PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          $results = Invoke-ScriptAnalyzer -Path . -Recurse -Severity Error,Warning -ExcludeRule PSAvoidUsingConvertToSecureStringWithPlainText
+          $results | Format-Table -AutoSize
+          
+          if ($results.Count -gt 0) {
+            Write-Output "PSScriptAnalyzer found $($results.Count) issues."
+            $results | Export-Csv -Path ScriptAnalyzerResults.csv -NoTypeInformation
+            throw "PSScriptAnalyzer found $($results.Count) issues."
+          }
+
+  publish:
+    name: Publish to PowerShell Gallery
+    needs: [test, analyze]
+    runs-on: windows-latest
+    if: github.event_name == 'release'
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Publish Module
+        shell: pwsh
+        env:
+          NUGET_KEY: ${{ secrets.PSGALLERY_API_KEY }}
+        run: |
+          $moduleName = "OSDCloudCustomBuilder"
+          $moduleManifest = Get-ChildItem -Path . -Filter "$moduleName.psd1" -Recurse | Select-Object -First 1
+          
+          if (-not $moduleManifest) {
+            throw "Module manifest not found!"
+          }
+          
+          $moduleInfo = Test-ModuleManifest -Path $moduleManifest.FullName
+          $moduleVersion = $moduleInfo.Version
+          
+          Write-Output "Publishing $moduleName version $moduleVersion to PowerShell Gallery"
+          
+          if ($env:NUGET_KEY) {
+            Publish-Module -Path $moduleManifest.Directory.FullName -NuGetApiKey $env:NUGET_KEY -Verbose
+            Write-Output "Module published successfully!"
+          } else {
+            throw "PowerShell Gallery API key not found!"
+          }

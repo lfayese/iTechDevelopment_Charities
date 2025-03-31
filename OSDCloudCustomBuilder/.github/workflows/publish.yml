@@ -1,0 +1,46 @@
+name: Publish to PowerShell Gallery
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish-to-gallery:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up PowerShell module
+        shell: pwsh
+        run: |
+          # Verify module structure
+          Get-ChildItem -Path . -Recurse
+          
+          # Test module manifest
+          $manifestPath = Get-ChildItem -Path . -Filter "*.psd1" -Recurse | 
+                          Where-Object { $_.Name -eq "OSDCloudCustomBuilder.psd1" } | 
+                          Select-Object -First 1 -ExpandProperty FullName
+          
+          Write-Output "Found module manifest at: $manifestPath"
+          $moduleInfo = Test-ModuleManifest -Path $manifestPath
+          Write-Output "Module version: $($moduleInfo.Version)"
+          
+      - name: Publish to PowerShell Gallery
+        shell: pwsh
+        env:
+          NUGET_KEY: ${{ secrets.PSGALLERY_API_KEY }}
+        run: |
+          $manifestPath = Get-ChildItem -Path . -Filter "*.psd1" -Recurse | 
+                          Where-Object { $_.Name -eq "OSDCloudCustomBuilder.psd1" } | 
+                          Select-Object -First 1 -ExpandProperty FullName
+          
+          $moduleDir = Split-Path -Path $manifestPath -Parent
+          
+          Write-Output "Publishing module from directory: $moduleDir"
+          
+          if ($env:NUGET_KEY) {
+            Publish-Module -Path $moduleDir -NuGetApiKey $env:NUGET_KEY -Verbose
+            Write-Output "Module published successfully!"
+          } else {
+            throw "PowerShell Gallery API key not found!"
+          }

@@ -294,13 +294,13 @@ function Import-OSDCloudConfig {
                     foreach ($validationError in $validation.Errors) {
                         Invoke-OSDCloudLogger -Message $validationError -Level Warning -Component "Import-OSDCloudConfig"
                     }
-                }
+               }
                 else {
                     Write-Warning $errorMessage
                     foreach ($validationError in $validation.Errors) {
                         Write-Warning $validationError
                     }
-                }
+               }
                 return $false
             }
             
