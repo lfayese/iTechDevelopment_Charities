@@ -25,11 +25,11 @@ $script:ModuleVersion = "1.0.0" # This should match the module manifest
 Write-Verbose "Loading OSDCloudCustomBuilder module v$script:ModuleVersion from $script:ModuleRoot"
 # Check if running in PS7+ for faster methods
 $script:IsPS7OrHigher = $PSVersionTable.PSVersion.Major -ge 7
-# Optimize function import with more efficient file processing using HashSet collection
+# Optimize function import with more efficient file processing using HashSet collections
 $PrivateFunctions = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
 $PublicFunctions = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+# Updated Import-ModuleFunctions function
 if ($script:IsPS7OrHigher) {
-    # PS7+ optimized import using parallel processing
     function Import-ModuleFunctions {
         param (
             [string]$Path,
@@ -39,28 +39,42 @@ if ($script:IsPS7OrHigher) {
         if (-not (Test-Path -Path $Path -ErrorAction SilentlyContinue)) { return }
         $files = @(Get-ChildItem -Path $Path -Filter "*.ps1" -File)
         if ($files.Count -eq 0) { return }
-        $threadSafeList = [System.Collections.Concurrent.ConcurrentBag[string]]::new()
-        try {
-            $files | ForEach-Object -Parallel {
-                try {
-                    # Dot source the file; since the file path is passed in as $_, the current scope is used.
-                    . $_.FullName
-                    ($using:threadSafeList).Add($_.BaseName)
+        # Use parallel processing only if file count exceeds a threshold (e.g., 3 files)
+        if ($files.Count -gt 3) {
+            $threadSafeList = [System.Collections.Concurrent.ConcurrentBag[string]]::new()
+            try {
+                $files | ForEach-Object -Parallel {
+                    try {
+                        . $_.FullName
+                        ($using:threadSafeList).Add($_.BaseName)
+                    }
+                    catch {
+                        Write-Error "Failed to import $($using:Type) function $($_.FullName): $_"
+                    }
+                } -ThrottleLimit 16
+                foreach ($item in $threadSafeList) {
+                    $FunctionList.Add($item) | Out-Null
                 }
-                catch {
-                    Write-Error "Failed to import $($using:Type) function $($_.FullName): $_"
+            }
+            catch {
+                Write-Warning "Parallel import failed, falling back to sequential processing."
+                foreach ($file in $files) {
+                    try {
+                        . $file.FullName
+                        $FunctionList.Add($file.BaseName) | Out-Null
+                    }
+                    catch {
+                        Write-Error "Failed to import $Type function $($file.FullName): $_"
+                    }
                 }
-            } -ThrottleLimit 16
-            foreach ($item in $threadSafeList) {
-                [void]$FunctionList.Add($item)
             }
         }
-        catch {
-            # Fallback to sequential loading if parallel fails
+        else {
+            # Sequential processing for small number of files to reduce overhead
             foreach ($file in $files) {
                 try {
                     . $file.FullName
-                    [void]$FunctionList.Add($file.BaseName)
+                    $FunctionList.Add($file.BaseName) | Out-Null
                 }
                 catch {
                     Write-Error "Failed to import $Type function $($file.FullName): $_"
@@ -81,7 +95,7 @@ else {
         foreach ($file in @(Get-ChildItem -Path $Path -Filter "*.ps1" -File)) {
             try {
                 . $file.FullName
-                [void]$FunctionList.Add($file.BaseName)
+                $FunctionList.Add($file.BaseName) | Out-Null
             }
             catch {
                 Write-Error "Failed to import $Type function $($file.FullName): $_"
@@ -101,7 +115,7 @@ if ($PrivatePathExists) {
 if ($PublicPathExists) {
     Import-ModuleFunctions -Path $PublicPath -FunctionList $PublicFunctions -Type "public"
 }
-# Verify required helper functions exist with fast HashSet lookups
+# Verify required helper functions exist using fast HashSet lookups
 $RequiredHelpers = [System.Collections.Generic.HashSet[string]]::new(
     [string[]]@('Copy-CustomWimToWorkspace', 'Copy-WimFileEfficiently', 'Customize-WinPEWithPowerShell7',
                 'Optimize-ISOSize', 'New-CustomISO', 'Show-Summary'),
@@ -120,8 +134,9 @@ if (-not (Get-Variable -Name 'DependencyCheckDone' -Scope Script -ErrorAction Si
     $script:RecommendedModuleStatus = @{}
     $recommendedModules = @('OSD')
     foreach ($moduleName in $recommendedModules) {
-        $script:RecommendedModuleStatus[$moduleName] = [bool](Get-Module -Name $moduleName -ListAvailable)
-        if (-not $script:RecommendedModuleStatus[$moduleName]) {
+        $status = [bool](Get-Module -Name $moduleName -ListAvailable)
+        $script:RecommendedModuleStatus[$moduleName] = $status
+        if (-not $status) {
             Write-Warning "Recommended module '$moduleName' is not installed. Some functionality may be limited."
         }
     }

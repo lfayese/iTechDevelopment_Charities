@@ -4,7 +4,9 @@
 .DESCRIPTION
     This function creates a complete OSDCloud ISO with a custom Windows Image (WIM) file,
     PowerShell 7 support, and customizations. It handles the entire process from
-    template creation to ISO generation.
+    template creation to ISO generation. The function includes comprehensive error handling,
+    logging support via Invoke-OSDCloudLogger, and WhatIf support for all major file operations.
+    It validates input parameters thoroughly and provides detailed feedback throughout the process.
 .PARAMETER WimPath
     The path to the Windows Image (WIM) file to include in the ISO.
 .PARAMETER OutputPath
@@ -29,7 +31,7 @@
     Requires administrator privileges and Windows ADK installed.
 #>
 function Add-CustomWimWithPwsh7 {
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'Medium')]
     param(
         [Parameter(Mandatory = $true)]
         [ValidateScript({
@@ -38,6 +40,9 @@ function Add-CustomWimWithPwsh7 {
             }
             if (-not ($_ -match '\.wim$')) {
                 throw "The file '$_' is not a WIM file."
+            }
+            if ((Get-Item $_).Length -eq 0) {
+                throw "The WIM file '$_' is empty."
             }
             return $true
         })]
@@ -129,7 +134,9 @@ function Add-CustomWimWithPwsh7 {
             $currentOperation = "Copying WIM file"
             Write-Host "Copying custom WIM to workspace..." -ForegroundColor Cyan
             try {
-                Copy-CustomWimToWorkspace -WimPath $WimPath -WorkspacePath $workspacePath -UseRobocopy -ErrorAction Stop
+                if ($PSCmdlet.ShouldProcess("Copy WIM file to workspace", "Copy-CustomWimToWorkspace")) {
+                    Copy-CustomWimToWorkspace -WimPath $WimPath -WorkspacePath $workspacePath -UseRobocopy -ErrorAction Stop
+                }
                 Write-Verbose "WIM file copied successfully"
             }
             catch {
@@ -137,13 +144,12 @@ function Add-CustomWimWithPwsh7 {
                 throw "Failed during operation '$currentOperation': $_"
             }
             
-            # Launch background tasks in parallel to reduce overall processing time.
-            # Note: For very limited parallel tasks, the overhead of Start-Job is minimal.
+            # Launch background tasks in parallel using Start-ThreadJob (lighter weight than Start-Job)
             $jobs = @()
             $currentOperation = "Adding PowerShell 7 and Optimizing ISO Size"
-            Write-Host "Starting background tasks..." -ForegroundColor Cyan
+            Write-Host "Starting background tasks using thread jobs..." -ForegroundColor Cyan
             
-            $jobs += Start-Job -ScriptBlock {
+            $jobs += Start-ThreadJob -ScriptBlock {
                 param($tempPath, $workspacePath, $psVersion)
                 try {
                     Customize-WinPEWithPowerShell7 -TempPath $tempPath -WorkspacePath $workspacePath -PowerShellVersion $psVersion -ErrorAction Stop
@@ -154,7 +160,7 @@ function Add-CustomWimWithPwsh7 {
                 }
             } -ArgumentList $tempWorkspacePath, $workspacePath, $PowerShellVersion
             
-            $jobs += Start-Job -ScriptBlock {
+            $jobs += Start-ThreadJob -ScriptBlock {
                 param($workspacePath)
                 try {
                     Optimize-ISOSize -WorkspacePath $workspacePath -ErrorAction Stop
@@ -176,6 +182,7 @@ function Add-CustomWimWithPwsh7 {
                     $errorCollection += $result.Message
                 }
             }
+            # Clean up thread jobs
             Remove-Job -Job $jobs -Force
             
             if ($errorCollection.Count -gt 0) {
@@ -206,14 +213,18 @@ function Add-CustomWimWithPwsh7 {
                 $errorCollection += "Error generating summary: $_"
                 Write-Warning "Could not generate summary: $_"
             }
-            
             Write-Host "✅ ISO created successfully at: $OutputPath" -ForegroundColor Green
         }
         catch {
-            Write-Error "An error occurred during '$currentOperation': $_"
+            $errorMessage = "An error occurred during '$currentOperation': $_"
+            if (Get-Command 'Invoke-OSDCloudLogger' -ErrorAction SilentlyContinue) {
+                Invoke-OSDCloudLogger -Message $errorMessage -Level Error
+            }
+            Write-Error $errorMessage
             throw $_
         }
         finally {
+            # Clean up temporary files unless skipping cleanup.
             if (-not $SkipCleanup) {
                 try {
                     if (Test-Path $TempPath) {

@@ -1,268 +1,232 @@
+<#
+.SYNOPSIS
+    Customizes a WinPE image with PowerShell 7 support.
+.DESCRIPTION
+    This function customizes a WinPE image by adding PowerShell 7 support, configuring startup settings,
+    and updating environment variables. It handles the entire process of mounting the WIM file,
+    making modifications, and dismounting with changes saved.
+.PARAMETER TempPath
+    The temporary path where working files will be stored.
+.PARAMETER WorkspacePath
+    The workspace path containing the WinPE image to customize.
+.PARAMETER PowerShellVersion
+    The PowerShell version to install. Default is "7.3.4".
+.PARAMETER PowerShell7File
+    The path to the PowerShell 7 zip file. If not specified, it will be downloaded.
+.EXAMPLE
+    Customize-WinPEWithPowerShell7 -TempPath "C:\Temp\OSDCloud" -WorkspacePath "C:\OSDCloud\Workspace"
+.EXAMPLE
+    Customize-WinPEWithPowerShell7 -TempPath "C:\Temp\OSDCloud" -WorkspacePath "C:\OSDCloud\Workspace" -PowerShellVersion "7.3.4"
+.EXAMPLE
+    Customize-WinPEWithPowerShell7 -TempPath "C:\Temp\OSDCloud" -WorkspacePath "C:\OSDCloud\Workspace" -PowerShell7File "C:\Temp\PowerShell-7.3.4-win-x64.zip"
+.NOTES
+    This function requires administrator privileges and the Windows ADK installed.
+#>
 function Customize-WinPEWithPowerShell7 {
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess)]
     param (
         [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
         [string]$TempPath,
         
         [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
         [string]$WorkspacePath,
         
-        [Parameter(Mandatory = $true)]
+        [Parameter()]
+        [ValidatePattern('^(\d+\.\d+\.\d+)$')]
+        [string]$PowerShellVersion = "7.3.4",
+        
+        [Parameter()]
+        [ValidateScript({
+            if ([string]::IsNullOrEmpty($_)) { return $true }
+            if (-not (Test-Path $_ -PathType Leaf)) {
+                throw "The PowerShell 7 file '$_' does not exist or is not a file."
+            }
+            if (-not ($_ -match '\.zip$')) {
+                throw "The file '$_' is not a ZIP file."
+            }
+            return $true
+        })]
         [string]$PowerShell7File
     )
     
-    # Generate a unique ID for this execution instance
-    $instanceId = [Guid]::NewGuid().ToString()
-    $uniqueMountPoint = Join-Path -Path $TempPath -ChildPath "Mount_$instanceId"
-    $lockFile = Join-Path -Path $env:TEMP -ChildPath "WinPE_Customize_Lock.mutex"
-    $maxRetries = 5
-    $retryDelayBase = 2
-    
-    # Helper function for retries with exponential backoff
-    function Invoke-WithRetry {
-        [CmdletBinding()]
-        param(
-            [Parameter(Mandatory)]
-            [scriptblock]$ScriptBlock,
-            
-            [Parameter()]
-            [string]$OperationName = "Operation",
-            
-            [Parameter()]
-            [int]$MaxRetries = 5,
-            
-            [Parameter()]
-            [int]$RetryDelayBase = 2
-        )
+    begin {
+        # Generate a unique ID for this execution instance
+        $instanceId = [Guid]::NewGuid().ToString()
         
-        $retryCount = 0
-        $completed = $false
-        $returnValue = $null
+        # Log operation start
+        if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+            Invoke-OSDCloudLogger -Message "Starting WinPE customization with PowerShell 7 v$PowerShellVersion" -Level Info -Component "Customize-WinPEWithPowerShell7"
+        }
         
-        do {
+        # If PowerShell7File is not specified, download it
+        if ([string]::IsNullOrEmpty($PowerShell7File)) {
             try {
-                Write-Verbose "Attempting $OperationName (Attempt $(($retryCount + 1)))"
-                $returnValue = & $ScriptBlock
-                $completed = $true
-            }
-            catch {
-                $retryCount++
-                $ex = $_
-                
-                # Determine if error is retryable - extend this list as needed
-                $retryableErrors = @(
-                    "being used by another process",
-                    "access is denied",
-                    "cannot access the file",
-                    "The process cannot access",
-                    "The requested operation cannot be performed"
-                )
-                
-                $isRetryable = $false
-                foreach ($errorPattern in $retryableErrors) {
-                    if ($ex.Exception.Message -match $errorPattern) {
-                        $isRetryable = $true
-                        break
-                    }
-                }
-                
-                if ($isRetryable -and $retryCount -lt $MaxRetries) {
-                    # Calculate delay with jitter for exponential backoff
-                    $delay = [math]::Pow($RetryDelayBase, $retryCount)
-                    $jitter = Get-Random -Minimum -500 -Maximum 500
-                    $delayMs = [math]::Max(1, ($delay * 1000) + $jitter)
+                if (Get-Command -Name Get-PowerShell7Package -ErrorAction SilentlyContinue) {
+                    $PowerShell7File = Get-PowerShell7Package -Version $PowerShellVersion -DownloadPath $TempPath
                     
-                    Write-Warning "$OperationName failed with retryable error: $($ex.Exception.Message)"
-                    Write-Verbose "Retrying in $($delayMs / 1000) seconds..."
-                    Start-Sleep -Milliseconds $delayMs
+                    if (-not $PowerShell7File -or -not (Test-Path $PowerShell7File)) {
+                        throw "Failed to download PowerShell 7 package"
+                    }
                 }
                 else {
-                    # Not retryable or max retries exceeded
-                    if ($retryCount -ge $MaxRetries) {
-                        Write-Error "Max retries ($MaxRetries) exceeded for $OperationName"
+                    # Fallback to direct download if Get-PowerShell7Package is not available
+                    $downloadUrl = "https://github.com/PowerShell/PowerShell/releases/download/v$PowerShellVersion/PowerShell-$PowerShellVersion-win-x64.zip"
+                    $PowerShell7File = Join-Path -Path $TempPath -ChildPath "PowerShell-$PowerShellVersion-win-x64.zip"
+                    
+                    if (-not (Test-Path $PowerShell7File)) {
+                        if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+                            Invoke-OSDCloudLogger -Message "Downloading PowerShell 7 v$PowerShellVersion from $downloadUrl" -Level Info -Component "Customize-WinPEWithPowerShell7"
+                        }
+                        
+                        # Create directory if it doesn't exist
+                        if (-not (Test-Path -Path $TempPath)) {
+                            New-Item -Path $TempPath -ItemType Directory -Force | Out-Null
+                        }
+                        
+                        # Download the file
+                        Invoke-WebRequest -Uri $downloadUrl -OutFile $PowerShell7File -UseBasicParsing
                     }
-                    else {
-                        Write-Error "Non-retryable error in ${OperationName}: $($ex.Exception.Message)"
-                    }
-                    throw $ex
                 }
-            }
-        } while (-not $completed)
-        
-        return $returnValue
-    }
-    
-    # Mutex implementation for PowerShell (for critical sections)
-    function Enter-CriticalSection {
-        param([string]$Name, [int]$Timeout = 60)
-        
-        $mutex = $null
-        $startTime = Get-Date
-        $gotLock = $false
-        
-        try {
-            # Create or open existing mutex
-            $mutex = New-Object System.Threading.Mutex($false, "Global\$Name")
-            
-            # Try to acquire the mutex with timeout
-            while (-not $gotLock) {
-                # Check if we've exceeded timeout
-                if ((New-TimeSpan -Start $startTime -End (Get-Date)).TotalSeconds -gt $Timeout) {
-                    throw "Timeout waiting for lock on $Name"
-                }
-                
-                # Try to acquire with a short timeout to allow for periodic retry
-                $gotLock = $mutex.WaitOne(5000)
-                
-                if (-not $gotLock) {
-                    Write-Verbose "Waiting for lock on $Name..."
-                    Start-Sleep -Milliseconds 500
-                }
-            }
-            
-            return $mutex
-        }
-        catch {
-            if ($mutex) { $mutex.Close(); $mutex.Dispose() }
-            throw "Failed to acquire lock: $_"
-        }
-    }
-    
-    function Exit-CriticalSection {
-        param($Mutex)
-        
-        if ($Mutex) {
-            try {
-                $Mutex.ReleaseMutex()
-                $Mutex.Close()
-                $Mutex.Dispose()
             }
             catch {
-                Write-Warning "Error releasing mutex: $_"
+                $errorMessage = "Failed to download PowerShell 7 package: $_"
+                if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+                    Invoke-OSDCloudLogger -Message $errorMessage -Level Error -Component "Customize-WinPEWithPowerShell7" -Exception $_.Exception
+                }
+                else {
+                    Write-Error $errorMessage
+                }
+                throw
             }
+        }
+        
+        # Verify PowerShell 7 file exists
+        if (-not (Test-Path -Path $PowerShell7File)) {
+            $errorMessage = "PowerShell 7 file not found at path: $PowerShell7File"
+            if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+                Invoke-OSDCloudLogger -Message $errorMessage -Level Error -Component "Customize-WinPEWithPowerShell7"
+            }
+            else {
+                Write-Error $errorMessage
+            }
+            throw $errorMessage
         }
     }
     
-    # Main execution starts here
-    try {
-        # Verify PowerShell 7 file exists
-        if (-not (Test-Path -Path $PowerShell7File)) {
-            throw "PowerShell 7 file not found at path: $PowerShell7File"
-        }
+    process {
+        $mountInfo = $null
         
-        # Create unique temporary paths
-        New-Item -Path $uniqueMountPoint -ItemType Directory -Force | Out-Null
-        $ps7TempPath = Join-Path -Path $TempPath -ChildPath "PowerShell7_$instanceId"
-        New-Item -Path $ps7TempPath -ItemType Directory -Force | Out-Null
-        
-        # Create StartupProfile folder (with mutex protection)
-        $mutex = Enter-CriticalSection -Name "WinPE_CustomizeStartupProfile"
         try {
-            $StartupProfilePath = Join-Path -Path $uniqueMountPoint -ChildPath "Windows\System32\StartupProfile"
-            New-Item -Path $StartupProfilePath -ItemType Directory -Force | Out-Null
-        }
-        finally {
-            Exit-CriticalSection -Mutex $mutex
-        }
-        
-        # Mount WinPE Image (protected with retry logic due to potential file locking)
-        $wimPath = Join-Path -Path $WorkspacePath -ChildPath "Media\Sources\boot.wim"
-        Invoke-WithRetry -OperationName "Mount-WindowsImage" -ScriptBlock {
-            Mount-WindowsImage -Path $uniqueMountPoint -ImagePath $wimPath -Index 1
-        } -MaxRetries $maxRetries -RetryDelayBase $retryDelayBase
-        
-        # Extract PowerShell 7 to the mount point with retry logic
-        Invoke-WithRetry -OperationName "Expand-Archive" -ScriptBlock {
-            Expand-Archive -Path $PowerShell7File -DestinationPath $ps7TempPath -Force
+            # Step 1: Initialize mount point and temporary directories
+            $mountInfo = Initialize-WinPEMountPoint -TempPath $TempPath -InstanceId $instanceId
+            $uniqueMountPoint = $mountInfo.MountPoint
+            $ps7TempPath = $mountInfo.PS7TempPath
             
-            # Copy PowerShell 7 to the mount point (with mutex protection for shared PE image)
-            $mutex = Enter-CriticalSection -Name "WinPE_CustomizeCopy"
+            # Step 2: Create startup profile directory
+            if ($PSCmdlet.ShouldProcess("WinPE Image", "Create startup profile directory")) {
+                New-WinPEStartupProfile -MountPoint $uniqueMountPoint
+            }
+            
+            # Step 3: Mount WinPE Image
+            $wimPath = Join-Path -Path $WorkspacePath -ChildPath "Media\Sources\boot.wim"
+            if (-not (Test-Path -Path $wimPath)) {
+                $errorMessage = "WinPE image not found at path: $wimPath"
+                if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+                    Invoke-OSDCloudLogger -Message $errorMessage -Level Error -Component "Customize-WinPEWithPowerShell7"
+                }
+                else {
+                    Write-Error $errorMessage
+                }
+                throw $errorMessage
+            }
+            
+            if ($PSCmdlet.ShouldProcess("WinPE Image", "Mount image for customization")) {
+                Mount-WinPEImage -ImagePath $wimPath -MountPath $uniqueMountPoint
+            }
+            
+            # Step 4: Install PowerShell 7
+            if ($PSCmdlet.ShouldProcess("WinPE Image", "Install PowerShell 7")) {
+                Install-PowerShell7ToWinPE -PowerShell7File $PowerShell7File -TempPath $ps7TempPath -MountPoint $uniqueMountPoint
+            }
+            
+            # Step 5: Update registry
+            if ($PSCmdlet.ShouldProcess("WinPE Image", "Update registry settings")) {
+                Update-WinPERegistry -MountPoint $uniqueMountPoint -PowerShell7Path "X:\Windows\System32\PowerShell7"
+            }
+            
+            # Step 6: Update startup configuration
+            if ($PSCmdlet.ShouldProcess("WinPE Image", "Update startup configuration")) {
+                Update-WinPEStartup -MountPoint $uniqueMountPoint -PowerShell7Path "X:\Windows\System32\PowerShell7"
+            }
+            
+            # Step 7: Dismount WinPE Image
+            if ($PSCmdlet.ShouldProcess("WinPE Image", "Dismount image and save changes")) {
+                Dismount-WinPEImage -MountPath $uniqueMountPoint -Save
+            }
+            
+            # Log success
+            if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+                Invoke-OSDCloudLogger -Message "WinPE customization with PowerShell 7 completed successfully" -Level Info -Component "Customize-WinPEWithPowerShell7"
+            }
+            
+            # Return the boot.wim path
+            return $wimPath
+        }
+        catch {
+            $errorMessage = "Failed to customize WinPE: $_"
+            if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+                Invoke-OSDCloudLogger -Message $errorMessage -Level Error -Component "Customize-WinPEWithPowerShell7" -Exception $_.Exception
+            }
+            else {
+                Write-Error $errorMessage
+            }
+            
+            # Try to dismount if mounted (don't save changes)
             try {
-                Copy-Item -Path "$ps7TempPath\*" -Destination "$uniqueMountPoint\Windows\System32\PowerShell7" -Recurse -Force
+                if ($mountInfo -and (Test-Path -Path $mountInfo.MountPoint)) {
+                    if ($PSCmdlet.ShouldProcess("WinPE Image", "Dismount image and discard changes due to error")) {
+                        Dismount-WinPEImage -MountPath $mountInfo.MountPoint -Discard
+                    }
+                }
             }
-            finally {
-                Exit-CriticalSection -Mutex $mutex
+            catch {
+                $cleanupError = "Error during cleanup: $_"
+                if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+                    Invoke-OSDCloudLogger -Message $cleanupError -Level Warning -Component "Customize-WinPEWithPowerShell7" -Exception $_.Exception
+                }
+                else {
+                    Write-Warning $cleanupError
+                }
             }
-        } -MaxRetries $maxRetries -RetryDelayBase $retryDelayBase
-        
-        # Update registry and environment (with mutex protection)
-        $mutex = Enter-CriticalSection -Name "WinPE_CustomizeRegistry"
-        try {
-            # Get current Path and PSModulePath
-            $currentPath = (Get-ItemProperty -Path "Registry::HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\Session Manager\Environment" -Name Path).Path
-            $currentPSModulePath = (Get-ItemProperty -Path "Registry::HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\Session Manager\Environment" -Name PSModulePath).PSModulePath
             
-            # Add PowerShell 7 to Path and update PSModulePath
-            $newPath = "$currentPath;X:\Windows\System32\PowerShell7"
-            $newPSModulePath = "$currentPSModulePath;X:\Windows\System32\PowerShell7\Modules"
-            
-            # Update the registry in the mounted WinPE image
-            reg load HKLM\WinPEOffline "$uniqueMountPoint\Windows\System32\config\SOFTWARE"
-            
-            # Set the updated Path and PSModulePath in the registry
-            New-ItemProperty -Path "Registry::HKLM\WinPEOffline\Microsoft\Windows\CurrentVersion\Run" -Name "UpdatePath" -Value "cmd.exe /c set PATH=$newPath" -PropertyType String -Force
-            New-ItemProperty -Path "Registry::HKLM\WinPEOffline\Microsoft\Windows\CurrentVersion\Run" -Name "UpdatePSModulePath" -Value "cmd.exe /c set PSModulePath=$newPSModulePath" -PropertyType String -Force
-            
-            # Unload the registry hive
-            reg unload HKLM\WinPEOffline
+            throw
         }
         finally {
-            Exit-CriticalSection -Mutex $mutex
-        }
-        
-        # Add startnet.cmd to run PowerShell 7 on startup
-        $startnetContent = @"
-@echo off
-cd\
-set PATH=%PATH%;X:\Windows\System32\PowerShell7
-X:\Windows\System32\PowerShell7\pwsh.exe -NoLogo -NoProfile
-"@
-        
-        # Write the startnet.cmd file (with mutex protection)
-        $mutex = Enter-CriticalSection -Name "WinPE_CustomizeStartnet"
-        try {
-            $startnetContent | Out-File -FilePath "$uniqueMountPoint\Windows\System32\startnet.cmd" -Encoding ascii -Force
-        }
-        finally {
-            Exit-CriticalSection -Mutex $mutex
-        }
-        
-        # Dismount WinPE Image with retry for locked files
-        Invoke-WithRetry -OperationName "Dismount-WindowsImage" -ScriptBlock {
-            Dismount-WindowsImage -Path $uniqueMountPoint -Save
-        } -MaxRetries $maxRetries -RetryDelayBase $retryDelayBase
-        
-        # Return the boot.wim path
-        return $wimPath
-    }
-    catch {
-        Write-Error "Failed to customize WinPE: $_"
-        
-        # Try to dismount if mounted (don't save changes)
-        try {
-            if (Test-Path -Path $uniqueMountPoint) {
-                Dismount-WindowsImage -Path $uniqueMountPoint -Discard -ErrorAction SilentlyContinue
+            # Clean up temporary resources
+            try {
+                if ($mountInfo) {
+                    # Clean up mount point
+                    if (Test-Path -Path $mountInfo.MountPoint) {
+                        Remove-Item -Path $mountInfo.MountPoint -Recurse -Force -ErrorAction SilentlyContinue
+                    }
+                    
+                    # Clean up PowerShell 7 temp path
+                    if (Test-Path -Path $mountInfo.PS7TempPath) {
+                        Remove-Item -Path $mountInfo.PS7TempPath -Recurse -Force -ErrorAction SilentlyContinue
+                    }
+                }
             }
-        }
-        catch {
-            Write-Warning "Error during cleanup: $_"
-        }
-        
-        throw
-    }
-    finally {
-        # Clean up temporary resources
-        try {
-            if (Test-Path -Path $uniqueMountPoint) {
-                Remove-Item -Path $uniqueMountPoint -Recurse -Force -ErrorAction SilentlyContinue
+            catch {
+                $cleanupError = "Error cleaning up temporary resources: $_"
+                if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+                    Invoke-OSDCloudLogger -Message $cleanupError -Level Warning -Component "Customize-WinPEWithPowerShell7" -Exception $_.Exception
+                }
+                else {
+                    Write-Warning $cleanupError
+                }
             }
-            
-            if (Test-Path -Path $ps7TempPath) {
-                Remove-Item -Path $ps7TempPath -Recurse -Force -ErrorAction SilentlyContinue
-            }
-        }
-        catch {
-            Write-Warning "Error cleaning up temporary resources: $_"
         }
     }
 }
