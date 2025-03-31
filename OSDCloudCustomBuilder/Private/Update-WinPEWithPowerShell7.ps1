@@ -1,28 +1,28 @@
 <#
 .SYNOPSIS
-    Customizes a WinPE image with PowerShell 7 support.
+    Updates a WinPE image with PowerShell 7 support.
 .DESCRIPTION
-    This function customizes a WinPE image by adding PowerShell 7 support, configuring startup settings,
+    This function updates a WinPE image by adding PowerShell 7 support, configuring startup settings,
     and updating environment variables. It handles the entire process of mounting the WIM file,
     making modifications, and dismounting with changes saved.
 .PARAMETER TempPath
     The temporary path where working files will be stored.
 .PARAMETER WorkspacePath
-    The workspace path containing the WinPE image to customize.
+    The workspace path containing the WinPE image to update.
 .PARAMETER PowerShellVersion
     The PowerShell version to install. Default is "7.3.4".
 .PARAMETER PowerShell7File
     The path to the PowerShell 7 zip file. If not specified, it will be downloaded.
 .EXAMPLE
-    Customize-WinPEWithPowerShell7 -TempPath "C:\Temp\OSDCloud" -WorkspacePath "C:\OSDCloud\Workspace"
+    Update-WinPEWithPowerShell7 -TempPath "C:\Temp\OSDCloud" -WorkspacePath "C:\OSDCloud\Workspace"
 .EXAMPLE
-    Customize-WinPEWithPowerShell7 -TempPath "C:\Temp\OSDCloud" -WorkspacePath "C:\OSDCloud\Workspace" -PowerShellVersion "7.3.4"
+    Update-WinPEWithPowerShell7 -TempPath "C:\Temp\OSDCloud" -WorkspacePath "C:\OSDCloud\Workspace" -PowerShellVersion "7.3.4"
 .EXAMPLE
-    Customize-WinPEWithPowerShell7 -TempPath "C:\Temp\OSDCloud" -WorkspacePath "C:\OSDCloud\Workspace" -PowerShell7File "C:\Temp\PowerShell-7.3.4-win-x64.zip"
+    Update-WinPEWithPowerShell7 -TempPath "C:\Temp\OSDCloud" -WorkspacePath "C:\OSDCloud\Workspace" -PowerShell7File "C:\Temp\PowerShell-7.3.4-win-x64.zip"
 .NOTES
     This function requires administrator privileges and the Windows ADK installed.
 #>
-function Customize-WinPEWithPowerShell7 {
+function Update-WinPEWithPowerShell7 {
     [CmdletBinding(SupportsShouldProcess)]
     param (
         [Parameter(Mandatory = $true)]
@@ -57,7 +57,7 @@ function Customize-WinPEWithPowerShell7 {
         
         # Log operation start
         if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
-            Invoke-OSDCloudLogger -Message "Starting WinPE customization with PowerShell 7 v$PowerShellVersion" -Level Info -Component "Customize-WinPEWithPowerShell7"
+            Invoke-OSDCloudLogger -Message "Starting WinPE update with PowerShell 7 v$PowerShellVersion" -Level Info -Component "Update-WinPEWithPowerShell7"
         }
         
         # If PowerShell7File is not specified, download it
@@ -77,7 +77,7 @@ function Customize-WinPEWithPowerShell7 {
                     
                     if (-not (Test-Path $PowerShell7File)) {
                         if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
-                            Invoke-OSDCloudLogger -Message "Downloading PowerShell 7 v$PowerShellVersion from $downloadUrl" -Level Info -Component "Customize-WinPEWithPowerShell7"
+                            Invoke-OSDCloudLogger -Message "Downloading PowerShell 7 v$PowerShellVersion from $downloadUrl" -Level Info -Component "Update-WinPEWithPowerShell7"
                         }
                         
                         # Create directory if it doesn't exist
@@ -93,7 +93,7 @@ function Customize-WinPEWithPowerShell7 {
             catch {
                 $errorMessage = "Failed to download PowerShell 7 package: $_"
                 if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
-                    Invoke-OSDCloudLogger -Message $errorMessage -Level Error -Component "Customize-WinPEWithPowerShell7" -Exception $_.Exception
+                    Invoke-OSDCloudLogger -Message $errorMessage -Level Error -Component "Update-WinPEWithPowerShell7" -Exception $_.Exception
                 }
                 else {
                     Write-Error $errorMessage
@@ -106,7 +106,7 @@ function Customize-WinPEWithPowerShell7 {
         if (-not (Test-Path -Path $PowerShell7File)) {
             $errorMessage = "PowerShell 7 file not found at path: $PowerShell7File"
             if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
-                Invoke-OSDCloudLogger -Message $errorMessage -Level Error -Component "Customize-WinPEWithPowerShell7"
+                Invoke-OSDCloudLogger -Message $errorMessage -Level Error -Component "Update-WinPEWithPowerShell7"
             }
             else {
                 Write-Error $errorMessage
@@ -134,7 +134,7 @@ function Customize-WinPEWithPowerShell7 {
             if (-not (Test-Path -Path $wimPath)) {
                 $errorMessage = "WinPE image not found at path: $wimPath"
                 if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
-                    Invoke-OSDCloudLogger -Message $errorMessage -Level Error -Component "Customize-WinPEWithPowerShell7"
+                    Invoke-OSDCloudLogger -Message $errorMessage -Level Error -Component "Update-WinPEWithPowerShell7"
                 }
                 else {
                     Write-Error $errorMessage
@@ -168,16 +168,16 @@ function Customize-WinPEWithPowerShell7 {
             
             # Log success
             if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
-                Invoke-OSDCloudLogger -Message "WinPE customization with PowerShell 7 completed successfully" -Level Info -Component "Customize-WinPEWithPowerShell7"
+                Invoke-OSDCloudLogger -Message "WinPE update with PowerShell 7 completed successfully" -Level Info -Component "Update-WinPEWithPowerShell7"
             }
             
             # Return the boot.wim path
             return $wimPath
         }
         catch {
-            $errorMessage = "Failed to customize WinPE: $_"
+            $errorMessage = "Failed to update WinPE: $_"
             if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
-                Invoke-OSDCloudLogger -Message $errorMessage -Level Error -Component "Customize-WinPEWithPowerShell7" -Exception $_.Exception
+                Invoke-OSDCloudLogger -Message $errorMessage -Level Error -Component "Update-WinPEWithPowerShell7" -Exception $_.Exception
             }
             else {
                 Write-Error $errorMessage
@@ -194,7 +194,7 @@ function Customize-WinPEWithPowerShell7 {
             catch {
                 $cleanupError = "Error during cleanup: $_"
                 if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
-                    Invoke-OSDCloudLogger -Message $cleanupError -Level Warning -Component "Customize-WinPEWithPowerShell7" -Exception $_.Exception
+                    Invoke-OSDCloudLogger -Message $cleanupError -Level Warning -Component "Update-WinPEWithPowerShell7" -Exception $_.Exception
                 }
                 else {
                     Write-Warning $cleanupError
@@ -221,7 +221,7 @@ function Customize-WinPEWithPowerShell7 {
             catch {
                 $cleanupError = "Error cleaning up temporary resources: $_"
                 if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
-                    Invoke-OSDCloudLogger -Message $cleanupError -Level Warning -Component "Customize-WinPEWithPowerShell7" -Exception $_.Exception
+                    Invoke-OSDCloudLogger -Message $cleanupError -Level Warning -Component "Update-WinPEWithPowerShell7" -Exception $_.Exception
                 }
                 else {
                     Write-Warning $cleanupError
@@ -230,3 +230,9 @@ function Customize-WinPEWithPowerShell7 {
         }
     }
 }
+
+# Add an alias for backward compatibility
+New-Alias -Name Customize-WinPEWithPowerShell7 -Value Update-WinPEWithPowerShell7 -Description "Backward compatibility alias" -Force
+
+# Export both the function and the alias
+Export-ModuleMember -Function Update-WinPEWithPowerShell7 -Alias Customize-WinPEWithPowerShell7

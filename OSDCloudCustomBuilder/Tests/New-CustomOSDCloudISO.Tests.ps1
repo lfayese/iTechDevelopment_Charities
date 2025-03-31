@@ -32,6 +32,7 @@ Describe "New-CustomOSDCloudISO" {
         Mock Build-ISO {}
         Mock Cleanup-Workspace {}
         Mock Invoke-OSDCloudLogger {}
+        Mock Update-WinPEWithPowerShell7 {}
         
         # Mock Security.Principal.WindowsPrincipal
         Mock ([Security.Principal.WindowsPrincipal]).GetMethod('IsInRole') { return $true }
@@ -160,7 +161,7 @@ Describe "New-CustomOSDCloudISO" {
         It "Should handle different PowerShell versions" {
             New-CustomOSDCloudISO -PwshVersion "7.4.1"
             
-            Should -Invoke Customize-WinPE -ParameterFilter { $PwshVersion -eq "7.4.1" } -Times 1
+            Should -Invoke Update-WinPEWithPowerShell7 -ParameterFilter { $PwshVersion -eq "7.4.1" } -Times 1
             
             Should -Invoke Invoke-OSDCloudLogger -ParameterFilter {
                 $Message -like "*Customizing WinPE with PowerShell 7.4.1*"

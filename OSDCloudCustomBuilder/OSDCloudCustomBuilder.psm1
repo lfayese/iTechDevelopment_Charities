@@ -96,7 +96,7 @@ if ($script:IsPS7OrHigher) {
     }
 }
 else {
-    # PS5.1 standard import
+    # PS5.1 standard import - FIXED: Added missing Type parameter
     function Import-ModuleFunctions {
         param (
             [string]$Path,
@@ -129,7 +129,7 @@ if ($PublicPathExists) {
 }
 # Verify required helper functions exist using fast HashSet lookups
 $RequiredHelpers = [System.Collections.Generic.HashSet[string]]::new(
-    [string[]]@('Copy-CustomWimToWorkspace', 'Copy-WimFileEfficiently', 'Customize-WinPEWithPowerShell7',
+    [string[]]@('Copy-CustomWimToWorkspace', 'Copy-WimFileEfficiently', 'Update-WinPEWithPowerShell7',
                 'Optimize-ISOSize', 'New-CustomISO', 'Show-Summary'),
     [StringComparer]::OrdinalIgnoreCase
 )
@@ -215,13 +215,13 @@ foreach ($funcName in $OSDCloudConfigFunctions) {
 $winPEPs7File = Join-Path -Path $script:ModuleRoot -ChildPath "Private\WinPE-PowerShell7.ps1"
 if ([System.IO.File]::Exists($winPEPs7File)) {
     . $winPEPs7File
-    $PrivateFunctions.Add('Customize-WinPEWithPowerShell7') | Out-Null
+    $PrivateFunctions.Add('Update-WinPEWithPowerShell7') | Out-Null
     Write-Verbose "Loaded PowerShell 7 customization functions from WinPE-PowerShell7.ps1"
 }
 else {
     Write-Warning "WinPE-PowerShell7.ps1 not found in Private folder. Using fallback implementation."
     # Fallback implementation
-    function Customize-WinPEWithPowerShell7 {
+    function Update-WinPEWithPowerShell7 {
         [CmdletBinding(SupportsShouldProcess=$true)]
         param (
             [Parameter(Mandatory=$true)]

@@ -165,7 +165,7 @@ function Add-CustomWimWithPwsh7 {
             $ps7CustomizationScript = {
                 param($tempPath, $workspacePath, $psVersion)
                 try {
-                    Customize-WinPEWithPowerShell7 -TempPath $tempPath -WorkspacePath $workspacePath -PowerShellVersion $psVersion -ErrorAction Stop
+                    Update-WinPEWithPowerShell7 -TempPath $tempPath -WorkspacePath $workspacePath -PowerShellVersion $psVersion -ErrorAction Stop
                     return @{ Success = $true; Message = "PowerShell 7 customization completed successfully" }
                 }
                 catch {

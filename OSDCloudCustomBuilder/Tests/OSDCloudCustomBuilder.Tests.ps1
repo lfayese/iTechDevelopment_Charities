@@ -27,7 +27,7 @@ Describe "OSDCloudCustomBuilder Module Tests" {
         function Initialize-OSDCloudTemplate { param($TempPath) return "C:\Temp\Workspace\OSDCloudWorkspace" }
         function Copy-CustomWimToWorkspace { param($WimPath, $WorkspacePath) }
         function Copy-CustomizationScripts { param($WorkspacePath, $ScriptPath) }
-        function Customize-WinPEWithPowerShell7 { param($TempPath, $WorkspacePath, $PowerShell7File) return "C:\Temp\Workspace\OSDCloudWorkspace\Media\Sources\boot.wim" }
+        function Update-WinPEWithPowerShell7 { param($TempPath, $WorkspacePath, $PowerShell7File) return "C:\bootWimPath" }
         function Optimize-ISOSize { param($WorkspacePath) }
         function New-CustomISO { param($WorkspacePath, $OutputPath, $ISOFileName, [switch]$IncludeWinRE) }
         function Remove-TempFiles { param($TempPath) }
@@ -113,7 +113,7 @@ Describe "OSDCloudCustomBuilder Module Tests" {
             Mock Initialize-OSDCloudTemplate { return "C:\Temp\OSDWorkspace" }
             Mock Copy-CustomWimToWorkspace {}
             Mock Copy-CustomizationScripts {}
-            Mock Customize-WinPEWithPowerShell7 { return "C:\bootWimPath" }
+            Mock Update-WinPEWithPowerShell7 { return "C:\bootWimPath" }
             Mock Optimize-ISOSize {}
             Mock New-CustomISO {}
             Mock Remove-TempFiles {}
@@ -128,7 +128,7 @@ Describe "OSDCloudCustomBuilder Module Tests" {
             Should -Invoke Initialize-OSDCloudTemplate -Times 1
             Should -Invoke Copy-CustomWimToWorkspace -Times 1
             Should -Invoke Copy-CustomizationScripts -Times 1
-            Should -Invoke Customize-WinPEWithPowerShell7 -Times 1
+            Should -Invoke Update-WinPEWithPowerShell7 -Times 1
             Should -Invoke Optimize-ISOSize -Times 1
             Should -Invoke New-CustomISO -Times 1
             Should -Invoke Remove-TempFiles -Times 1
@@ -150,7 +150,7 @@ Describe "OSDCloudCustomBuilder Module Tests" {
             Mock Initialize-OSDCloudTemplate { return "C:\Temp\OSDWorkspace" }
             Mock Copy-CustomWimToWorkspace {}
             Mock Copy-CustomizationScripts {}
-            Mock Customize-WinPEWithPowerShell7 { return "C:\bootWimPath" }
+            Mock Update-WinPEWithPowerShell7 { return "C:\bootWimPath" }
             Mock Optimize-ISOSize {}
             Mock New-CustomISO {}
             Mock Remove-TempFiles {}

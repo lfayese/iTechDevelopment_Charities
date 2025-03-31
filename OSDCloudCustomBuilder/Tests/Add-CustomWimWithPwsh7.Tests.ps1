@@ -11,7 +11,7 @@ Describe "Add-CustomWimWithPwsh7" {
         function Initialize-OSDCloudTemplate { param($TempPath) return "C:\Temp\Workspace\OSDCloudWorkspace" }
         function Copy-CustomWimToWorkspace { param($WimPath, $WorkspacePath) }
         function Copy-CustomizationScripts { param($WorkspacePath, $ScriptPath) }
-        function Customize-WinPEWithPowerShell7 { param($TempPath, $WorkspacePath, $PowerShell7File) return "C:\bootWimPath" }
+        function Update-WinPEWithPowerShell7 { param($TempPath, $WorkspacePath, $PowerShell7File) return "C:\bootWimPath" }
         function Optimize-ISOSize { param($WorkspacePath) }
         function New-CustomISO { param($WorkspacePath, $OutputPath, $ISOFileName, [switch]$IncludeWinRE) }
         function Remove-TempFiles { param($TempPath) }
@@ -63,7 +63,7 @@ Describe "Add-CustomWimWithPwsh7" {
         Mock Initialize-OSDCloudTemplate { return "C:\Temp\OSDWorkspace" }
         Mock Copy-CustomWimToWorkspace {}
         Mock Copy-CustomizationScripts {}
-        Mock Customize-WinPEWithPowerShell7 { return "C:\bootWimPath" }
+        Mock Update-WinPEWithPowerShell7 { return "C:\bootWimPath" }
         Mock Optimize-ISOSize {}
         Mock New-CustomISO {}
         Mock Remove-TempFiles {}
@@ -80,7 +80,7 @@ Describe "Add-CustomWimWithPwsh7" {
         Should -Invoke Initialize-OSDCloudTemplate -Times 1
         Should -Invoke Copy-CustomWimToWorkspace -Times 1
         Should -Invoke Copy-CustomizationScripts -Times 1
-        Should -Invoke Customize-WinPEWithPowerShell7 -Times 1
+        Should -Invoke Update-WinPEWithPowerShell7 -Times 1
         Should -Invoke Optimize-ISOSize -Times 1
         Should -Invoke New-CustomISO -Times 1
         Should -Invoke Remove-TempFiles -Times 1
@@ -96,7 +96,7 @@ Describe "Add-CustomWimWithPwsh7" {
         Mock Initialize-OSDCloudTemplate { return "C:\Temp\OSDWorkspace" }
         Mock Copy-CustomWimToWorkspace {}
         Mock Copy-CustomizationScripts {}
-        Mock Customize-WinPEWithPowerShell7 { return "C:\bootWimPath" }
+        Mock Update-WinPEWithPowerShell7 { return "C:\bootWimPath" }
         Mock Optimize-ISOSize {}
         Mock New-CustomISO {}
         Mock Remove-TempFiles {}
@@ -118,7 +118,7 @@ Describe "Add-CustomWimWithPwsh7" {
         Mock Initialize-OSDCloudTemplate { return "C:\Temp\OSDWorkspace" }
         Mock Copy-CustomWimToWorkspace {}
         Mock Copy-CustomizationScripts {}
-        Mock Customize-WinPEWithPowerShell7 { return "C:\bootWimPath" }
+        Mock Update-WinPEWithPowerShell7 { return "C:\bootWimPath" }
         Mock Optimize-ISOSize {}
         Mock New-CustomISO {}
         Mock Remove-TempFiles {}
@@ -130,6 +130,31 @@ Describe "Add-CustomWimWithPwsh7" {
         # Verify New-CustomISO was called with IncludeWinRE
         Should -Invoke New-CustomISO -Times 1 -ParameterFilter {
             $IncludeWinRE -eq $true
+        }
+    }
+
+    Context "Error Handling" {
+        It "Should throw when WIM file doesn't exist" {
+            { Add-CustomWimWithPwsh7 -WimPath "C:\NonExistent.wim" -OutputPath "C:\Output" } |
+                Should -Throw "does not exist"
+        }
+
+        It "Should throw when WIM file has invalid extension" {
+            { Add-CustomWimWithPwsh7 -WimPath "C:\InvalidFile.txt" -OutputPath "C:\Output" } |
+                Should -Throw "not a WIM file"
+        }
+
+        It "Should handle network download failures gracefully" {
+            Mock Invoke-WebRequest { throw "Network error" }
+            { Add-CustomWimWithPwsh7 -WimPath "C:\valid\file.wim" -OutputPath "C:\Output" -SkipAdminCheck } |
+                Should -Throw "*download*"
+        }
+    }
+
+    Context "Parameter Validation" {
+        It "Should throw when PowerShell version format is invalid" {
+            { Add-CustomWimWithPwsh7 -WimPath "C:\valid\file.wim" -OutputPath "C:\Output" -PowerShellVersion "7.5" } |
+                Should -Throw
         }
     }
 }
