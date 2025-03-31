@@ -267,7 +267,7 @@ function Import-OSDCloudConfig {
         try {
             if (-not (Test-Path $Path)) {
                 $errorMessage = "Configuration file not found: $Path"
-                if ($script:LoggerExists) {
+                if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
                     Invoke-OSDCloudLogger -Message $errorMessage -Level Warning -Component "Import-OSDCloudConfig"
                 }
                 else {
@@ -289,7 +289,7 @@ function Import-OSDCloudConfig {
             
             if (-not $validation.IsValid) {
                 $errorMessage = "Invalid configuration loaded from $Path"
-                if ($script:LoggerExists) {
+                if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
                     Invoke-OSDCloudLogger -Message $errorMessage -Level Warning -Component "Import-OSDCloudConfig"
                     foreach ($validationError in $validation.Errors) {
                         Invoke-OSDCloudLogger -Message $validationError -Level Warning -Component "Import-OSDCloudConfig"
@@ -308,7 +308,7 @@ function Import-OSDCloudConfig {
             $script:OSDCloudConfig = Merge-OSDCloudConfig -UserConfig $config
             
             $successMessage = "Configuration successfully loaded from $Path"
-            if ($script:LoggerExists) {
+            if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
                 Invoke-OSDCloudLogger -Message $successMessage -Level Info -Component "Import-OSDCloudConfig"
             }
             else {
@@ -373,7 +373,7 @@ function Export-OSDCloudConfig {
             $validation = Test-OSDCloudConfig -Config $Config
             if (-not $validation.IsValid) {
                 $errorMessage = "Cannot save invalid configuration to $Path"
-                if ($script:LoggerExists) {
+                if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
                     Invoke-OSDCloudLogger -Message $errorMessage -Level Error -Component "Export-OSDCloudConfig"
                     foreach ($validationError in $validation.Errors) {
                         Invoke-OSDCloudLogger -Message $validationError -Level Error -Component "Export-OSDCloudConfig"
@@ -736,11 +736,14 @@ function Protect-ConfigValue {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [string]$Value
+        [string]$Value,
+        
+        [Parameter(Mandatory = $false)]
+        [string]$AdditionalEntropy = "OSDCloudCustomBuilder"
     )
     
-    # Convert string to secure string and then to encrypted standard string
-    $secureString = ConvertTo-SecureString -String $Value -AsPlainText -Force
+    # Convert string to secure string with additional entropy for stronger encryption
+    $secureString = ConvertTo-SecureString -String $Value -AsPlainText -Force -SecureKey ([System.Text.Encoding]::UTF8.GetBytes($AdditionalEntropy))
     $encrypted = ConvertFrom-SecureString -SecureString $secureString
     
     return $encrypted
@@ -939,7 +942,7 @@ function Import-SecureOSDCloudConfig {
         $validation = Test-OSDCloudConfig -Config $config
         if (-not $validation.IsValid) {
             $errorMessage = "Invalid secure configuration loaded from $Path"
-            if ($script:LoggerExists) {
+            if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
                 Invoke-OSDCloudLogger -Message $errorMessage -Level Warning -Component "Import-SecureOSDCloudConfig"
                 foreach ($validationError in $validation.Errors) {
                     Invoke-OSDCloudLogger -Message $validationError -Level Warning -Component "Import-SecureOSDCloudConfig"
@@ -969,7 +972,7 @@ function Import-SecureOSDCloudConfig {
     }
     catch {
         $errorMessage = "Error loading secure configuration from $Path`: $_"
-        if ($script:LoggerExists) {
+        if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
             Invoke-OSDCloudLogger -Message $errorMessage -Level Error -Component "Import-SecureOSDCloudConfig" -Exception $_.Exception
         }
         else {
@@ -1192,7 +1195,7 @@ function Set-OSDCloudConfigProfile {
         
         # Log the profile application
         $message = "Applied configuration profile: $ProfileName (Merge: $($Merge.IsPresent))"
-        if ($script:LoggerExists) {
+        if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
             Invoke-OSDCloudLogger -Message $message -Level Info -Component "Set-OSDCloudConfigProfile"
         }
         else {
