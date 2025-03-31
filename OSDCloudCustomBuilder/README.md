@@ -13,6 +13,8 @@ This solution enables you to:
 - Support multiple languages
 - Integrate custom WIM files for specialized deployments
 - Leverage PowerShell 7 for enhanced deployment capabilities
+- Utilize enhanced security features with package verification and TLS 1.2
+- Take advantage of performance optimizations with parallel processing
 
 ## Prerequisites
 
@@ -36,8 +38,9 @@ This solution enables you to:
 - `/OSDCloudCustomBuilder`: PowerShell module for creating deployment media
   - `OSDCloudCustomBuilder.psm1`: Main module that exports functions for creating custom OSDCloud environments
   - Public functions:
-    - `Add-CustomWimWithPwsh7`: Adds PowerShell 7 and custom WIM files to OSDCloud environment
+    - `Update-CustomWimWithPwsh7`: Adds PowerShell 7 and custom WIM files to OSDCloud environment
     - `New-CustomOSDCloudISO`: Creates bootable ISO with the custom configuration
+    - `Set-OSDCloudCustomBuilderConfig`: Configures module settings for customization
 
 ## Getting Started
 
@@ -74,13 +77,19 @@ Get-Module OSD -ListAvailable
 3. **Customize WinPE**
    Customize your Windows Preinstallation Environment with PowerShell 7:
    ```powershell
-   Customize-WinPEWithPowerShell7 -Path "PathToWinPE"
+   Update-WinPEWithPowerShell7 -Path "PathToWinPE"
    ```
 
-4. **Verbose Logging**
+4. **Configure Module Settings**
+   Configure PowerShell versions, timeouts, and other settings:
+   ```powershell
+   Set-OSDCloudCustomBuilderConfig -DefaultPowerShellVersion "7.5.0" -MountTimeout 600
+   ```
+
+5. **Verbose Logging**
    All operations now include structured logging with timestamps for easier troubleshooting. Example log format:
    ```
-   [2023-03-15 10:00:00] [INFO] Starting Export-OSDCloudFunction
+   [2025-03-31 10:00:00] [INFO] [OSDCloudCustomBuilder] Starting Update-CustomWimWithPwsh7
    ```
 
 ## Using the OSDCloud Custom Interface
@@ -93,13 +102,13 @@ The custom interface (`iDcMDMOSDCloudGUI.ps1`) provides a simplified deployment 
 2. Open PowerShell and navigate to the repository folder:
 
 ```powershell
-cd D:\iTechDevelopment_Charities\OSDCloud
+cd D:\\iTechDevelopment_Charities\\OSDCloud
 ```
 
 3. Run the custom OSDCloud GUI script:
 
 ```powershell
-.\OSDCloudDeploymentGUI.ps1
+.\\OSDCloudDeploymentGUI.ps1
 ```
 
 ### Step 2: Using the Deployment Interface
@@ -110,7 +119,7 @@ cd D:\iTechDevelopment_Charities\OSDCloud
   - Microsoft Update Catalog (recommended for most cases)
   - Manufacturer-specific driver packs (if available)
   - No drivers (for specialized deployments)
-- **Custom WIM Support**: Automatically detects and allows selection of custom Windows images if present in X:\OSDCloud\custom.wim
+- **Custom WIM Support**: Automatically detects and allows selection of custom Windows images if present in X:\\OSDCloud\\custom.wim
 
 To deploy Windows:
 1. Select your preferred language
@@ -135,26 +144,34 @@ The OSDCloudCustomBuilder module is designed to create customized deployment med
 1. Import the OSDCloudCustomBuilder module:
 
 ```powershell
-Import-Module -Path "D:\iTechDevelopment_Charities\OSDCloudCustomBuilder\OSDCloudCustomBuilder.psm1" -Force
+Import-Module -Path "D:\\iTechDevelopment_Charities\\OSDCloudCustomBuilder\\OSDCloudCustomBuilder.psm1" -Force
 ```
 
 2. Create a custom OSDCloud environment with PowerShell 7 and a custom WIM:
 
 ```powershell
-Add-CustomWimWithPwsh7 -WimPath "C:\Path\to\your\windows.wim" -OutputPath "C:\OSDCloud"
+Update-CustomWimWithPwsh7 -WimPath "C:\\Path\\to\\your\\windows.wim" -OutputPath "C:\\OSDCloud"
 ```
 
 3. Available parameters:
    - `-WimPath`: Path to your custom Windows image file  
-     Example: `-WimPath "C:\Path\to\your\windows.wim"`
+     Example: `-WimPath "C:\\Path\\to\\your\\windows.wim"`
    - `-OutputPath`: Destination folder for the OSDCloud workspace  
-     Example: `-OutputPath "C:\OSDCloud"`
+     Example: `-OutputPath "C:\\OSDCloud"`
    - `-ISOFileName`: Specify a custom ISO filename  
      Example: `-ISOFileName "CustomOSDCloud.iso"`
    - `-IncludeWinRE`: Include WinRE for WiFi support  
      Example: `-IncludeWinRE $true`
    - `-SkipCleanup`: Retain temporary files for troubleshooting  
      Example: `-SkipCleanup $true`
+   - `-PowerShellVersion`: Specify PowerShell version to use  
+     Example: `-PowerShellVersion "7.5.0"`
+   - `-MountTimeout`: Set timeout for mounting operations (in seconds)  
+     Example: `-MountTimeout 600`
+   - `-DismountTimeout`: Set timeout for dismounting operations (in seconds)  
+     Example: `-DismountTimeout 600`
+   - `-DownloadTimeout`: Set timeout for download operations (in seconds)  
+     Example: `-DownloadTimeout 1200`
 
 ### Creating Bootable Media
 
@@ -163,14 +180,34 @@ After creating your custom workspace:
 1. Create a bootable USB drive:
 
 ```powershell
-New-OSDCloudUSB -WorkspacePath C:\OSDCloud
+New-OSDCloudUSB -WorkspacePath C:\\OSDCloud
 ```
 
 2. Or create a bootable ISO file:
 
 ```powershell
-New-OSDCloudISO -WorkspacePath C:\OSDCloud
+New-OSDCloudISO -WorkspacePath C:\\OSDCloud
 ```
+
+### Configuring Module Settings
+
+The module now includes a configuration system that allows you to customize various settings:
+
+```powershell
+Set-OSDCloudCustomBuilderConfig -DefaultPowerShellVersion "7.5.0" -SupportedPowerShellVersions @("7.3.4", "7.4.1", "7.5.0") -MountTimeout 600 -DismountTimeout 600 -DownloadTimeout 1200 -CachePath "C:\\OSDCloudCache"
+```
+
+Available configuration options:
+- `-DefaultPowerShellVersion`: Set the default PowerShell version to use
+- `-SupportedPowerShellVersions`: Specify supported PowerShell versions
+- `-PowerShellVersionHashes`: Add hash values for PowerShell package verification
+- `-PowerShellDownloadUrl`: Customize the PowerShell download URL template
+- `-MountTimeout`: Set default timeout for mounting operations
+- `-DismountTimeout`: Set default timeout for dismounting operations
+- `-DownloadTimeout`: Set default timeout for download operations
+- `-JobTimeout`: Set default timeout for background jobs
+- `-CachePath`: Specify custom path for caching downloaded packages
+- `-TempPath`: Specify custom path for temporary files
 
 ## Integration Between OSDCloud and OSDCloudCustomBuilder
 
@@ -180,6 +217,9 @@ The repository is structured to provide a complete Windows deployment solution:
    - Adds PowerShell 7 to the WinPE environment
    - Injects custom Windows images into deployment media
    - Creates bootable ISOs with optimized size
+   - Verifies package integrity with hash validation
+   - Implements secure TLS 1.2 communication
+   - Caches downloaded packages for improved performance
 
 2. **OSDCloud** provides the deployment experience:
    - Detects custom WIM files created by OSDCloudCustomBuilder
@@ -199,11 +239,11 @@ The solution includes Windows Autopilot integration which can be used directly f
 1. Boot the target device into WinPE using the custom OSDCloud media
 2. Navigate to the Autopilot folder:
 ```powershell
-cd D:\iTechDevelopment_Charities\OSDCloud\Autopilot
+cd D:\\iTechDevelopment_Charities\\OSDCloud\\Autopilot
 ```
 3. Execute the Autopilot registration script:
 ```powershell
-.\OSDCloud_UploadAutopilot.ps1
+.\\OSDCloud_UploadAutopilot.ps1
 ```
 
 This process:
@@ -216,8 +256,8 @@ This process:
 ### Customizing the Deployment Process
 
 The main configuration files can be found in:
-- `OSDCloud\iDcMDMOSDCloudGUI.ps1`: Contains the GUI configuration and deployment settings
-- `OSDCloud\iDCMDMUI.ps1`: Contains the launcher interface settings
+- `OSDCloud\\iDcMDMOSDCloudGUI.ps1`: Contains the GUI configuration and deployment settings
+- `OSDCloud\\iDCMDMUI.ps1`: Contains the launcher interface settings
 
 Key configuration elements include:
 - OS Edition settings (Enterprise by default)
@@ -231,15 +271,37 @@ The solution includes PowerShell 7 support for enhanced deployment capabilities:
 - PowerShell 7 is integrated into the WinPE environment by the OSDCloudCustomBuilder
 - Provides improved performance and advanced scripting features
 - Enables more complex deployment scenarios
+- Includes package verification with SHA-256 hash validation
+- Uses TLS 1.2 for secure downloads
+- Implements caching for improved performance and reduced bandwidth usage
+
+### Security Enhancements
+
+The module now includes several security enhancements:
+- **Package Verification**: All PowerShell 7 packages are verified using SHA-256 hash validation
+- **Secure Communication**: TLS 1.2 is enforced for all web requests
+- **Command Escaping**: Proper escaping of paths and commands to prevent injection attacks
+- **Parameter Validation**: Thorough validation of all input parameters
+- **Error Handling**: Comprehensive error handling with proper cleanup of resources
+
+### Performance Optimizations
+
+The module includes several performance optimizations:
+- **Parallel Processing**: File operations are performed in parallel when possible
+- **Package Caching**: Downloaded PowerShell packages are cached for reuse
+- **Memory Management**: Explicit garbage collection to reduce memory usage
+- **Configurable Timeouts**: All operations have configurable timeouts
 
 ## Troubleshooting
 
 - **Hardware Compatibility Issues**: The script automatically checks for TPM 2.0 and CPU compatibility. If Windows 11 compatibility is not detected, it will default to Windows 10.
 - **Driver Problems**: If you experience driver issues, try using a different driver source in the GUI.
 - **Log Files**: 
-  - WinPE Phase: Logs are stored in `X:\OSDCloud\Logs`
-  - Windows Phase: Logs are stored in `C:\Windows\Logs\OSDCloud`
+  - WinPE Phase: Logs are stored in `X:\\OSDCloud\\Logs`
+  - Windows Phase: Logs are stored in `C:\\Windows\\Logs\\OSDCloud`
+  - Module logs: Stored in `%TEMP%\\OSDCloudCustomBuilder\\Logs`
 - **Custom WIM Not Detected**: Verify the custom.wim file is placed in one of the supported locations. The deployment interface searches multiple locations and connected USB drives.
+- **Package Verification Failures**: If hash verification fails, try clearing the cache or updating the hash values with `Set-OSDCloudCustomBuilderConfig`
 
 ## Support and Contribution
 

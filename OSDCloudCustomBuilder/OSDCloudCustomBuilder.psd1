@@ -9,7 +9,6 @@
     PowerShellVersion = '5.1'
     FunctionsToExport = @(
         'Update-CustomWimWithPwsh7',
-        'Add-CustomWimWithPwsh7',
         'New-CustomOSDCloudISO',
         'Get-OSDCloudConfig',
         'Import-OSDCloudConfig',
@@ -47,6 +46,8 @@
 - Enhanced integration between OSDCloud and OSDCloudCustomBuilder
 - Improved memory management with explicit garbage collection
 - Added backward compatibility aliases for renamed functions
+- Renamed Customize-WinPEWithPowerShell7 to Update-WinPEWithPowerShell7 for better verb-noun consistency
+- Renamed Add-CustomWimWithPwsh7 to Update-CustomWimWithPwsh7 for better verb-noun consistency
 
 # Version 0.1.0
 - Initial release of OSDCloudCustomBuilder

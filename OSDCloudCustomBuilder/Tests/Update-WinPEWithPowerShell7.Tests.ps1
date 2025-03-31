@@ -1,4 +1,4 @@
-Describe "Customize-WinPEWithPowerShell7 Concurrency Tests" {
+Describe "Update-WinPEWithPowerShell7 Concurrency Tests" {
     BeforeAll {
         # Initialize a common test environment
         $script:testEnv = Initialize-TestEnvironment -TestName "Concurrency"
@@ -19,20 +19,35 @@ Describe "Customize-WinPEWithPowerShell7 Concurrency Tests" {
         Mock reg { return $true }
         Mock New-ItemProperty { return $true }
         Mock Out-File { return $true }
-        Mock Get-ItemProperty { return @{ Path = "C:\Windows"; PSModulePath = "C:\Modules" } }
+        Mock Get-ItemProperty { return @{ Path = "C:\\Windows"; PSModulePath = "C:\\Modules" } }
         Mock New-Item { return [PSCustomObject]@{ FullName = $Path } }
         Mock Remove-Item { return $true }
         Mock Test-Path { return $true }
+        
+        # Add mock for the alias to support backward compatibility in tests
+        if (-not (Get-Command -Name Customize-WinPEWithPowerShell7 -ErrorAction SilentlyContinue)) {
+            function Customize-WinPEWithPowerShell7 {
+                [CmdletBinding()]
+                param(
+                    [string]$TempPath,
+                    [string]$WorkspacePath,
+                    [string]$PowerShell7File
+                )
+                Update-WinPEWithPowerShell7 -TempPath $TempPath -WorkspacePath $WorkspacePath -PowerShell7File $PowerShell7File
+            }
+        }
     }
+    
     It "Should implement retry logic for transient failures" {
         # Reset the counter
         $script:mountAttempts = 0
-        $result = Customize-WinPEWithPowerShell7 -TempPath $testEnv.TempPath -WorkspacePath $testEnv.WorkspacePath -PowerShell7File $testEnv.PowerShell7File
+        $result = Update-WinPEWithPowerShell7 -TempPath $testEnv.TempPath -WorkspacePath $testEnv.WorkspacePath -PowerShell7File $testEnv.PowerShell7File
         # Ensure that the Mount-WindowsImage function retried (i.e. was invoked more than once)
         $script:mountAttempts | Should -BeGreaterThan 1
         # Verify that the result (boot.wim path) is as expected
-        $result | Should -Be "$($testEnv.WorkspacePath)\Media\Sources\boot.wim"
+        $result | Should -Be "$($testEnv.WorkspacePath)\\Media\\Sources\\boot.wim"
     }
+    
     It "Should handle multiple simultaneous executions" -Skip:($PSVersionTable.PSVersion.Major -lt 7) {
         # Create a runspace pool with limited concurrency
         $pool = [runspacefactory]::CreateRunspacePool(1, 3)
@@ -48,7 +63,7 @@ Describe "Customize-WinPEWithPowerShell7 Concurrency Tests" {
                     # Import the function (in production, consider converting this to a module import)
                     . $ScriptPath
                     try {
-                        $result = Customize-WinPEWithPowerShell7 -TempPath $TempPath -WorkspacePath $WorkspacePath -PowerShell7File $Ps7Path
+                        $result = Update-WinPEWithPowerShell7 -TempPath $TempPath -WorkspacePath $WorkspacePath -PowerShell7File $Ps7Path
                         return @{
                             Success = $true
                             Result = $result
@@ -67,7 +82,7 @@ Describe "Customize-WinPEWithPowerShell7 Concurrency Tests" {
                     TempPath = "$($testEnv.TempPath)_$i"
                     WorkspacePath = "$($testEnv.WorkspacePath)_$i"
                     Ps7Path = $testEnv.PowerShell7File
-                    ScriptPath = "$PSScriptRoot\..\Private\Customize-WinPEWithPowerShell7.ps1"
+                    ScriptPath = "$PSScriptRoot\\..\\Private\\Update-WinPEWithPowerShell7.ps1"
                 })
                 $handle = $ps.BeginInvoke()
                 $runspaces += @{
@@ -88,5 +103,16 @@ Describe "Customize-WinPEWithPowerShell7 Concurrency Tests" {
             $pool.Close()
             $pool.Dispose()
         }
+    }
+    
+    # Test backward compatibility with alias
+    It "Should support backward compatibility with Customize-WinPEWithPowerShell7 alias" {
+        # Reset the counter
+        $script:mountAttempts = 0
+        $result = Customize-WinPEWithPowerShell7 -TempPath $testEnv.TempPath -WorkspacePath $testEnv.WorkspacePath -PowerShell7File $testEnv.PowerShell7File
+        # Ensure that the Mount-WindowsImage function retried (i.e. was invoked more than once)
+        $script:mountAttempts | Should -BeGreaterThan 1
+        # Verify that the result (boot.wim path) is as expected
+        $result | Should -Be "$($testEnv.WorkspacePath)\\Media\\Sources\\boot.wim"
     }
 }
