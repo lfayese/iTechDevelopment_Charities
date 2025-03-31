@@ -3,10 +3,8 @@ function Copy-FilesInParallel {
     param (
         [Parameter(Mandatory = $true)]
         [string]$SourcePath,
-        
         [Parameter(Mandatory = $true)]
         [string]$DestinationPath,
-        
         [Parameter()]
         [int]$MaxThreads = 8
     )
@@ -24,32 +22,26 @@ function Copy-FilesInParallel {
     Write-OSDCloudLog -Message "Using ThreadJob: $useThreadJob, MaxThreads: $MaxThreads, Files to copy: $($files.Count)" -Level Info -Component "Copy-FilesInParallel"
     
     if ($useThreadJob) {
-        # Use ThreadJob for parallel processing
+        # Use ThreadJob for parallel processing.
+        # Removed shared counter and progress reporting to avoid thread contention.
         try {
-            $totalFiles = $files.Count
-            $processedFiles = 0
             $jobs = $files | ForEach-Object -ThrottleLimit $MaxThreads -Parallel {
-                $script:processedFiles++
-                Write-Progress -Activity "Copying Files" -Status "Processing file $script:processedFiles of $using:totalFiles" -PercentComplete (($script:processedFiles / $using:totalFiles) * 100)
                 $sourcePath = $_.FullName
                 $relativePath = $_.FullName.Substring($using:SourcePath.Length)
                 $destPath = Join-Path -Path $using:DestinationPath -ChildPath $relativePath
-                
                 $destDir = Split-Path -Path $destPath -Parent
                 if (-not (Test-Path -Path $destDir)) {
                     New-Item -Path $destDir -ItemType Directory -Force | Out-Null
                 }
-                
                 try {
                     $copyTime = Measure-Command {
                         Copy-Item -Path $sourcePath -Destination $destPath -Force
                         $null = ($using:threadSafeList).Add($destPath)
                     }
                     Write-OSDCloudLog -Message "Copied $sourcePath in $($copyTime.TotalSeconds) seconds" -Level Info -Component "Copy-FilesInParallel"
-                    [System.GC]::Collect()
                 }
                 catch {
-                    Write-Error "Failed to copy $sourcePath to $destPath: $_"
+                    Write-Error "Failed to copy $sourcePath to $destPath $_"
                 }
             }
         }
@@ -59,38 +51,34 @@ function Copy-FilesInParallel {
         }
     }
     else {
-        # Fallback to regular jobs
+        # Fallback to regular jobs with pre-caching of directory creation
         $jobs = @()
         $chunks = [System.Collections.ArrayList]::new()
-        
-        # Split files into chunks
         $chunkSize = [Math]::Ceiling($files.Count / $MaxThreads)
         for ($i = 0; $i -lt $files.Count; $i += $chunkSize) {
             $end = [Math]::Min($i + $chunkSize - 1, $files.Count - 1)
             [void]$chunks.Add($files[$i..$end])
         }
-        
         Write-OSDCloudLog -Message "Using standard jobs with $($chunks.Count) chunks" -Level Info -Component "Copy-FilesInParallel"
-        
-        # Process each chunk in a separate job
         foreach ($chunk in $chunks) {
             $job = Start-Job -ScriptBlock {
                 param($files, $sourcePath, $destPath, $list)
-                
+                # Cache for directory creation to avoid repeated file system calls
+                $dirCache = @{}
                 foreach ($file in $files) {
                     $relativePath = $file.FullName.Substring($sourcePath.Length)
                     $targetPath = Join-Path -Path $destPath -ChildPath $relativePath
-                    
                     $targetDir = Split-Path -Path $targetPath -Parent
-                    if (-not (Test-Path -Path $targetDir)) {
-                        New-Item -Path $targetDir -ItemType Directory -Force | Out-Null
+                    if (-not $dirCache.ContainsKey($targetDir)) {
+                        if (-not (Test-Path -Path $targetDir)) {
+                            New-Item -Path $targetDir -ItemType Directory -Force | Out-Null
+                        }
+                        $dirCache[$targetDir] = $true
                     }
-                    
                     try {
                         $maxRetries = 3
                         $retryCount = 0
                         $success = $false
-                        
                         while (-not $success -and $retryCount -lt $maxRetries) {
                             try {
                                 Copy-Item -Path $file.FullName -Destination $targetPath -Force
@@ -108,23 +96,18 @@ function Copy-FilesInParallel {
                         }
                     }
                     catch {
-                        Write-Error "Failed to copy $($file.FullName) to $targetPath: $_"
+                        Write-Error "Failed to copy $($file.FullName) to $targetPath $_"
                     }
                 }
             } -ArgumentList $chunk, $SourcePath, $DestinationPath, $threadSafeList
-            
             $jobs += $job
         }
-        
-        # Wait for all jobs to complete
-        $jobs | Wait-Job | Receive-Job
+        $jobs | Wait-Job | ForEach-Object { Receive-Job -Job $_ } | Out-Null
         $jobs | Remove-Job
     }
     
     Write-OSDCloudLog -Message "Parallel file copy completed. Copied $($threadSafeList.Count) of $($files.Count) files." -Level Info -Component "Copy-FilesInParallel"
-    
     return $threadSafeList
 }
-
 # Export the function
 Export-ModuleMember -Function Copy-FilesInParallel
