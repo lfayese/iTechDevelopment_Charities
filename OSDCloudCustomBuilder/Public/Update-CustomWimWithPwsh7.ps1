@@ -85,22 +85,14 @@ function Update-CustomWimWithPwsh7 {
         [Parameter()]
         [int]$MaxThreads = 4
     )
-    
     begin {
         $errorCollection = @()
         $operationTimeout = (Get-Date).AddMinutes($TimeoutMinutes)
-        
-        # Get module configuration
         $config = Get-ModuleConfiguration
-        
-        # Log operation start
-        Write-OSDCloudLog -Message "TLS 1.2 enforced for secure communications" -Level Info -Component "Update-CustomWimWithPwsh7"
-        Write-OSDCloudLog -Message "Starting OSDCloud ISO creation with custom WIM and PowerShell $PowerShellVersion" -Level Info -Component "Update-CustomWimWithPwsh7"
-        
-        # Check for administrator privileges once
+        # Check administrator privileges once
         try {
             $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
-                [Security.Principal.WindowsBuiltInRole]::Administrator)
+                            [Security.Principal.WindowsBuiltInRole]::Administrator)
             if (-not $isAdmin) {
                 $errorMessage = "This function requires administrator privileges to run properly."
                 Write-OSDCloudLog -Message $errorMessage -Level Error -Component "Update-CustomWimWithPwsh7"
@@ -112,8 +104,7 @@ function Update-CustomWimWithPwsh7 {
             Write-OSDCloudLog -Message $errorMessage -Level Error -Component "Update-CustomWimWithPwsh7" -Exception $_.Exception
             throw "Administrator privilege check failed. Please run as administrator."
         }
-        
-        # Enforce TLS 1.2
+        # Enforce TLS 1.2 once
         try {
             [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
             Write-OSDCloudLog -Message "TLS 1.2 enforced for secure communications" -Level Info -Component "Update-CustomWimWithPwsh7"
@@ -123,11 +114,9 @@ function Update-CustomWimWithPwsh7 {
             Write-OSDCloudLog -Message $errorMessage -Level Error -Component "Update-CustomWimWithPwsh7" -Exception $_.Exception
             throw $errorMessage
         }
-
-        # Cache the drive letter once to reduce repeated lookups
+        # Cache drive details only once
         try {
             $tempDrive = (Split-Path -Path $TempPath -Qualifier)
-            # Assume drive letter is the first character of the qualifier
             $driveLetter = $tempDrive.Substring(0,1)
             $psDrive = Get-PSDrive -Name $driveLetter -ErrorAction Stop
             $freeSpace = $psDrive.Free
@@ -144,7 +133,6 @@ function Update-CustomWimWithPwsh7 {
             Write-OSDCloudLog -Message $warningMessage -Level Warning -Component "Update-CustomWimWithPwsh7" -Exception $_.Exception
             Write-Warning "Could not verify disk space. Proceeding anyway, but may encounter space issues."
         }
-        
         # Set up workspace paths and output ISO file path
         $workspacePath = Join-Path -Path $TempPath -ChildPath "Workspace"
         $tempWorkspacePath = Join-Path -Path $TempPath -ChildPath "TempWorkspace"
@@ -152,8 +140,7 @@ function Update-CustomWimWithPwsh7 {
             $OutputPath = Join-Path -Path $OutputPath -ChildPath $ISOFileName
         }
         $outputDirectory = Split-Path -Path $OutputPath -Parent
-        
-        # Create necessary directories in a single loop
+        # Create all necessary directories in a single loop
         try {
             foreach ($dir in @($workspacePath, $tempWorkspacePath, $outputDirectory)) {
                 if (-not (Test-Path $dir)) {
@@ -167,8 +154,7 @@ function Update-CustomWimWithPwsh7 {
             Write-OSDCloudLog -Message $errorMessage -Level Error -Component "Update-CustomWimWithPwsh7" -Exception $_.Exception
             throw "Directory creation failed: $_"
         }
-        
-        # Check if ThreadJob module is available and try to import if needed
+        # Check for ThreadJob module availability; prefer ThreadJob for performance
         $useThreadJobs = $false
         try {
             if (-not (Get-Command -Name Start-ThreadJob -ErrorAction SilentlyContinue)) {
@@ -176,47 +162,42 @@ function Update-CustomWimWithPwsh7 {
                     Import-Module -Name ThreadJob -ErrorAction Stop
                     $useThreadJobs = $true
                     Write-OSDCloudLog -Message "Successfully imported ThreadJob module" -Level Info -Component "Update-CustomWimWithPwsh7"
-                } else {
+                }
+                else {
                     Write-OSDCloudLog -Message "ThreadJob module not available, falling back to standard Jobs" -Level Info -Component "Update-CustomWimWithPwsh7"
                 }
-            } else {
+            }
+            else {
                 $useThreadJobs = $true
                 Write-OSDCloudLog -Message "Using existing ThreadJob module" -Level Info -Component "Update-CustomWimWithPwsh7"
             }
-        } catch {
+        }
+        catch {
             $warningMessage = "Could not import ThreadJob module: $_. Using standard Jobs instead."
             Write-OSDCloudLog -Message $warningMessage -Level Warning -Component "Update-CustomWimWithPwsh7" -Exception $_.Exception
             Write-Warning $warningMessage
         }
     }
-    
     process {
         try {
             Write-OSDCloudLog -Message "Starting OSDCloud ISO creation process" -Level Info -Component "Update-CustomWimWithPwsh7"
-            
             if ((Get-Date) -gt $operationTimeout) {
                 $errorMessage = "Operation timed out before completion."
                 Write-OSDCloudLog -Message $errorMessage -Level Error -Component "Update-CustomWimWithPwsh7"
                 throw $errorMessage
             }
-            
             # Verify PowerShell 7 package availability
             $currentOperation = "Verifying PowerShell 7 package"
             Write-Host "Verifying PowerShell 7 package availability..." -ForegroundColor Cyan
-            
-            # Check if we have a cached package
             $ps7PackagePath = $null
             $cachedPackage = Get-CachedPowerShellPackage -Version $PowerShellVersion
-            
             if ($cachedPackage) {
                 $ps7PackagePath = $cachedPackage
                 Write-OSDCloudLog -Message "Using cached PowerShell 7 package: $ps7PackagePath" -Level Info -Component "Update-CustomWimWithPwsh7"
             }
             else {
-                # Download PowerShell 7 package
                 $ps7PackagePath = Join-Path -Path $tempWorkspacePath -ChildPath "PowerShell-$PowerShellVersion-win-x64.zip"
                 Write-OSDCloudLog -Message "Downloading PowerShell 7 v$PowerShellVersion" -Level Info -Component "Update-CustomWimWithPwsh7"
-                
                 try {
                     $ps7PackagePath = Get-PowerShell7Package -Version $PowerShellVersion -DownloadPath $ps7PackagePath
                 }
@@ -226,11 +207,9 @@ function Update-CustomWimWithPwsh7 {
                     throw $errorMessage
                 }
             }
-            
             # Copy the WIM file to the workspace
             $currentOperation = "Copying WIM file"
             Write-Host "Copying custom WIM to workspace..." -ForegroundColor Cyan
-            
             try {
                 if ($PSCmdlet.ShouldProcess("Copy WIM file to workspace", "Copy-CustomWimToWorkspace")) {
                     Write-OSDCloudLog -Message "Copying WIM file from $WimPath to workspace" -Level Info -Component "Update-CustomWimWithPwsh7"
@@ -243,16 +222,16 @@ function Update-CustomWimWithPwsh7 {
                 Write-OSDCloudLog -Message $errorMessage -Level Error -Component "Update-CustomWimWithPwsh7" -Exception $_.Exception
                 throw "Failed during operation '$currentOperation': $_"
             }
-            
-            # Define script blocks for background tasks
+            # Define script blocks for background tasks.
+            # Note: To reduce repeated module imports, if the module is light you might pre-import it in the global runspace and pass functions via $using: scope.
             $ps7CustomizationScript = {
                 param($tempPath, $workspacePath, $psVersion, $ps7PackagePath)
                 try {
-                    # Import required modules and functions
                     $modulePath = Join-Path -Path (Split-Path -Path $workspacePath -Parent) -ChildPath "..\OSDCloudCustomBuilder.psm1"
-                    Import-Module $modulePath -Force -ErrorAction Stop
-                    
-                    # Use the PS7 package we already verified/downloaded
+                    # Only import if not already loaded in the current runspace
+                    if (-not (Get-Module -Name OSDCloudCustomBuilder)) {
+                        Import-Module $modulePath -Force -ErrorAction Stop
+                    }
                     Update-WinPEWithPowerShell7 -TempPath $tempPath -WorkspacePath $workspacePath -PowerShellVersion $psVersion -PowerShell7File $ps7PackagePath -ErrorAction Stop
                     return @{ Success = $true; Message = "PowerShell 7 customization completed successfully" }
                 }
@@ -260,14 +239,13 @@ function Update-CustomWimWithPwsh7 {
                     return @{ Success = $false; Message = "PowerShell 7 customization failed: $_" }
                 }
             }
-            
             $isoOptimizationScript = {
                 param($workspacePath)
                 try {
-                    # Import required modules and functions
                     $modulePath = Join-Path -Path (Split-Path -Path $workspacePath -Parent) -ChildPath "..\OSDCloudCustomBuilder.psm1"
-                    Import-Module $modulePath -Force -ErrorAction Stop
-                    
+                    if (-not (Get-Module -Name OSDCloudCustomBuilder)) {
+                        Import-Module $modulePath -Force -ErrorAction Stop
+                    }
                     Optimize-ISOSize -WorkspacePath $workspacePath -ErrorAction Stop
                     return @{ Success = $true; Message = "ISO size optimization completed successfully" }
                 }
@@ -275,13 +253,11 @@ function Update-CustomWimWithPwsh7 {
                     return @{ Success = $false; Message = "ISO size optimization failed: $_" }
                 }
             }
-            
-            # Start jobs using appropriate method based on module availability
+            # Start background jobs using the preferred method
             $jobs = @()
             $currentOperation = "Adding PowerShell 7 and Optimizing ISO Size"
             Write-Host "Starting background tasks..." -ForegroundColor Cyan
             Write-OSDCloudLog -Message "Starting background tasks for PowerShell 7 integration and ISO optimization" -Level Info -Component "Update-CustomWimWithPwsh7"
-
             if ($useThreadJobs) {
                 Write-OSDCloudLog -Message "Using ThreadJob for parallel processing" -Level Info -Component "Update-CustomWimWithPwsh7"
                 try {
@@ -295,8 +271,6 @@ function Update-CustomWimWithPwsh7 {
                     $useThreadJobs = $false
                 }
             }
-
-            # If ThreadJobs aren't available or failed, use standard jobs
             if (-not $useThreadJobs -or $jobs.Count -eq 0) {
                 Write-OSDCloudLog -Message "Using standard Jobs for parallel processing" -Level Info -Component "Update-CustomWimWithPwsh7"
                 try {
@@ -309,24 +283,19 @@ function Update-CustomWimWithPwsh7 {
                     throw $errorMessage
                 }
             }
-
             $currentOperation = "Processing background jobs"
             $jobTimeoutSeconds = $config.Timeouts.Job
             Write-OSDCloudLog -Message "Waiting for background jobs to complete (timeout: $jobTimeoutSeconds seconds)" -Level Info -Component "Update-CustomWimWithPwsh7"
-
-            # Ensure we have jobs to process before waiting
             if ($jobs.Count -eq 0) {
                 $errorMessage = "No background jobs were created successfully."
                 Write-OSDCloudLog -Message $errorMessage -Level Error -Component "Update-CustomWimWithPwsh7"
                 throw $errorMessage
             }
-
             if (-not (Wait-Job -Job $jobs -Timeout $jobTimeoutSeconds)) {
                 $errorMessage = "Background jobs timed out after $($jobTimeoutSeconds / 60) minutes."
                 Write-OSDCloudLog -Message $errorMessage -Level Error -Component "Update-CustomWimWithPwsh7"
                 throw $errorMessage
             }
-
             foreach ($job in $jobs) {
                 $result = Receive-Job -Job $job
                 if ($null -eq $result) {
@@ -342,30 +311,23 @@ function Update-CustomWimWithPwsh7 {
                     Write-OSDCloudLog -Message $result.Message -Level Info -Component "Update-CustomWimWithPwsh7"
                 }
             }
-
-            # Clean up jobs
             Remove-Job -Job $jobs -Force -ErrorAction SilentlyContinue
-            
             if ($errorCollection.Count -gt 0) {
                 $errorMessage = "One or more background tasks failed: $($errorCollection -join ', ')"
                 Write-OSDCloudLog -Message $errorMessage -Level Error -Component "Update-CustomWimWithPwsh7"
                 throw $errorMessage
             }
-            
             # Create the ISO file
             $currentOperation = "Creating ISO file"
             Write-Host "Creating custom ISO: $OutputPath" -ForegroundColor Cyan
             Write-OSDCloudLog -Message "Creating ISO file at $OutputPath" -Level Info -Component "Update-CustomWimWithPwsh7"
-            
             try {
                 New-CustomISO -WorkspacePath $workspacePath -OutputPath $OutputPath -IncludeWinRE:$IncludeWinRE -ErrorAction Stop
-                
                 if (-not (Test-Path -Path $OutputPath)) {
                     $errorMessage = "ISO file was not created at $OutputPath"
                     Write-OSDCloudLog -Message $errorMessage -Level Error -Component "Update-CustomWimWithPwsh7"
                     throw $errorMessage
                 }
-                
                 Write-OSDCloudLog -Message "ISO creation completed successfully" -Level Info -Component "Update-CustomWimWithPwsh7"
             }
             catch {
@@ -373,8 +335,7 @@ function Update-CustomWimWithPwsh7 {
                 Write-OSDCloudLog -Message $errorMessage -Level Error -Component "Update-CustomWimWithPwsh7" -Exception $_.Exception
                 throw "Failed during operation '$currentOperation': $_"
             }
-            
-            # Generate a summary
+            # Generate a summary report
             $currentOperation = "Generating summary"
             try {
                 Show-Summary -WindowsImage $WimPath -ISOPath $OutputPath -IncludeWinRE:$IncludeWinRE -ErrorAction Stop
@@ -385,11 +346,8 @@ function Update-CustomWimWithPwsh7 {
                 Write-OSDCloudLog -Message $warningMessage -Level Warning -Component "Update-CustomWimWithPwsh7" -Exception $_.Exception
                 Write-Warning "Could not generate summary: $_"
             }
-            
             Write-Host "✅ ISO created successfully at: $OutputPath" -ForegroundColor Green
             Write-OSDCloudLog -Message "ISO created successfully at: $OutputPath" -Level Info -Component "Update-CustomWimWithPwsh7"
-            
-            # Force garbage collection to free up memory
             [System.GC]::Collect()
         }
         catch {
@@ -399,7 +357,6 @@ function Update-CustomWimWithPwsh7 {
             throw $_
         }
         finally {
-            # Clean up temporary files unless skipping cleanup.
             if (-not $SkipCleanup) {
                 try {
                     if (Test-Path $TempPath) {
@@ -419,9 +376,6 @@ function Update-CustomWimWithPwsh7 {
         }
     }
 }
-
-# Add an alias for backward compatibility
+# Backward compatibility alias
 New-Alias -Name Add-CustomWimWithPwsh7 -Value Update-CustomWimWithPwsh7 -Description "Backward compatibility alias" -Force
-
-# Export both the function and the alias
 Export-ModuleMember -Function Update-CustomWimWithPwsh7 -Alias Add-CustomWimWithPwsh7
