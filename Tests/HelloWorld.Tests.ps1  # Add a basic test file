@@ -1,0 +1,5 @@
+Describe 'Hello World Tests' {
+    It 'should return true for true' {
+        $true | Should -Be $true
+    }
+}

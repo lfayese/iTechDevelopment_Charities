@@ -58,6 +58,31 @@ Get-Module OSD -ListAvailable
 
 4. Clone or download this repository to a local folder
 
+## Quick Start Guide
+
+1. **Install the Module**
+   ```powershell
+   Import-Module ./OSDCloudCustomBuilder.psm1
+   ```
+
+2. **Export Functions**
+   Use the `Export-OSDCloudFunction` to export required functions:
+   ```powershell
+   Export-OSDCloudFunction -FunctionName "YourFunctionName"
+   ```
+
+3. **Customize WinPE**
+   Customize your Windows Preinstallation Environment with PowerShell 7:
+   ```powershell
+   Customize-WinPEWithPowerShell7 -Path "PathToWinPE"
+   ```
+
+4. **Verbose Logging**
+   All operations now include structured logging with timestamps for easier troubleshooting. Example log format:
+   ```
+   [2023-03-15 10:00:00] [INFO] Starting Export-OSDCloudFunction
+   ```
+
 ## Using the OSDCloud Custom Interface
 
 The custom interface (`iDcMDMOSDCloudGUI.ps1`) provides a simplified deployment experience specifically tailored for charity organizations. This section walks through how to use this interface.

@@ -122,6 +122,23 @@ function Add-CustomWimWithPwsh7 {
             $errorCollection += "Failed to create required directories: $_"
             throw "Directory creation failed: $_"
         }
+        
+        # Check if ThreadJob module is available and try to import if needed
+        $useThreadJobs = $false
+        try {
+            if (-not (Get-Command -Name Start-ThreadJob -ErrorAction SilentlyContinue)) {
+                if (Get-Module -Name ThreadJob -ListAvailable) {
+                    Import-Module -Name ThreadJob -ErrorAction Stop
+                    $useThreadJobs = $true
+                } else {
+                    Write-Verbose "ThreadJob module not available, falling back to standard Jobs"
+                }
+            } else {
+                $useThreadJobs = $true
+            }
+        } catch {
+            Write-Warning "Could not import ThreadJob module: $_. Using standard Jobs instead."
+        }
     }
     process {
         try {
@@ -144,12 +161,8 @@ function Add-CustomWimWithPwsh7 {
                 throw "Failed during operation '$currentOperation': $_"
             }
             
-            # Launch background tasks in parallel using Start-ThreadJob (lighter weight than Start-Job)
-            $jobs = @()
-            $currentOperation = "Adding PowerShell 7 and Optimizing ISO Size"
-            Write-Host "Starting background tasks using thread jobs..." -ForegroundColor Cyan
-            
-            $jobs += Start-ThreadJob -ScriptBlock {
+            # Define script blocks for background tasks
+            $ps7CustomizationScript = {
                 param($tempPath, $workspacePath, $psVersion)
                 try {
                     Customize-WinPEWithPowerShell7 -TempPath $tempPath -WorkspacePath $workspacePath -PowerShellVersion $psVersion -ErrorAction Stop
@@ -158,9 +171,9 @@ function Add-CustomWimWithPwsh7 {
                 catch {
                     return @{ Success = $false; Message = "PowerShell 7 customization failed: $_" }
                 }
-            } -ArgumentList $tempWorkspacePath, $workspacePath, $PowerShellVersion
+            }
             
-            $jobs += Start-ThreadJob -ScriptBlock {
+            $isoOptimizationScript = {
                 param($workspacePath)
                 try {
                     Optimize-ISOSize -WorkspacePath $workspacePath -ErrorAction Stop
@@ -169,21 +182,62 @@ function Add-CustomWimWithPwsh7 {
                 catch {
                     return @{ Success = $false; Message = "ISO size optimization failed: $_" }
                 }
-            } -ArgumentList $workspacePath
+            }
             
+            # Start jobs using appropriate method based on module availability
+            $jobs = @()
+            $currentOperation = "Adding PowerShell 7 and Optimizing ISO Size"
+            Write-Host "Starting background tasks..." -ForegroundColor Cyan
+
+            if ($useThreadJobs) {
+                Write-Verbose "Using ThreadJob for parallel processing"
+                try {
+                    $jobs += Start-ThreadJob -ScriptBlock $ps7CustomizationScript -ArgumentList $tempWorkspacePath, $workspacePath, $PowerShellVersion
+                    $jobs += Start-ThreadJob -ScriptBlock $isoOptimizationScript -ArgumentList $workspacePath
+                }
+                catch {
+                    Write-Warning "Error starting ThreadJob: $_. Falling back to standard Jobs."
+                    $useThreadJobs = $false
+                }
+            }
+
+            # If ThreadJobs aren't available or failed, use standard jobs
+            if (-not $useThreadJobs -or $jobs.Count -eq 0) {
+                Write-Verbose "Using standard Jobs for parallel processing"
+                try {
+                    $jobs += Start-Job -ScriptBlock $ps7CustomizationScript -ArgumentList $tempWorkspacePath, $workspacePath, $PowerShellVersion
+                    $jobs += Start-Job -ScriptBlock $isoOptimizationScript -ArgumentList $workspacePath
+                }
+                catch {
+                    $errorCollection += "Failed to create background jobs: $_"
+                    throw "Failed to create background jobs: $_"
+                }
+            }
+
             $currentOperation = "Processing background jobs"
             $jobTimeoutSeconds = 20 * 60
+
+            # Ensure we have jobs to process before waiting
+            if ($jobs.Count -eq 0) {
+                throw "No background jobs were created successfully."
+            }
+
             if (-not (Wait-Job -Job $jobs -Timeout $jobTimeoutSeconds)) {
                 throw "Background jobs timed out after 20 minutes."
             }
+
             foreach ($job in $jobs) {
                 $result = Receive-Job -Job $job
-                if (-not $result.Success) {
+                if ($null -eq $result) {
+                    $errorCollection += "Job $($job.Id) returned null result"
+                }
+                elseif (-not $result.Success) {
                     $errorCollection += $result.Message
                 }
             }
-            # Clean up thread jobs
-            Remove-Job -Job $jobs -Force
+
+            # Clean up jobs
+            Remove-Job -Job $jobs -Force -ErrorAction SilentlyContinue
             
             if ($errorCollection.Count -gt 0) {
                 throw "One or more background tasks failed: $($errorCollection -join ', ')"
