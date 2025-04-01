@@ -6,10 +6,10 @@ BeforeAll {
     
     # Mock dependencies
     function Invoke-OSDCloudLogger {}
-    function Get-OSDCloudConfig {}
-    function Invoke-WithRetry {}
-    function Enter-CriticalSection {}
-    function Exit-CriticalSection {}
+    function Get-OSDCloudConfig { return @{ MaxRetryAttempts = 3, RetryDelaySeconds = 2 } }
+    function Invoke-WithRetry { param($ScriptBlock, $OperationName, $MaxRetries, $RetryDelayBase) & $ScriptBlock }
+    function Enter-CriticalSection { param($Name) return [PSCustomObject]@{ Name = "MockMutex" } }
+    function Exit-CriticalSection { param($Mutex) }
 }
 
 Describe "WinPE-Customization" {
@@ -19,7 +19,7 @@ Describe "WinPE-Customization" {
         Mock Write-Warning {}
         Mock Write-Error {}
         Mock Write-Verbose {}
-        Mock New-Item {}
+        Mock New-Item { return [PSCustomObject]@{ FullName = $Path } }
         Mock Test-Path { return $true }
         Mock Copy-Item {}
         Mock Remove-Item {}
@@ -36,6 +36,7 @@ Describe "WinPE-Customization" {
         
         # Mock registry commands
         Mock reg {}
+        $global:LASTEXITCODE = 0
     }
     
     Context "Initialize-WinPEMountPoint" {
@@ -259,7 +260,7 @@ Describe "WinPE-Customization" {
         }
         
         It "Should handle registry load errors" {
-            Mock reg { return "Error loading registry"; $global:LASTEXITCODE = 1 } -ParameterFilter {
+            Mock reg { $global:LASTEXITCODE = 1; return "Error loading registry" } -ParameterFilter {
                 $args -contains "load"
             }
             

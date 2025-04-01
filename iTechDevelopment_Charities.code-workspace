@@ -6,6 +6,56 @@
 	],
 	"settings": {
 		"bitoAI.codeCompletion.enableCommentToCode": true,
-		"bitoAI.codeCompletion.enableAutoCompletion": false
+		"bitoAI.codeCompletion.enableAutoCompletion": false,
+		"dbcode.connections": [
+			{
+				"connectionId": "qwWVgXWAZzKVBmIAUJZKo",
+				"name": "Functions",
+				"driver": "csv",
+				"socket": "iTechDevelopment_Charities/OSDCloudCodebaseDB/Functions.csv",
+				"driverOptions": {
+					"format": "auto"
+				},
+				"readOnly": false,
+				"role": "development",
+				"connectionType": "socket"
+			},
+			{
+				"connectionId": "ntv63HSGDkkyunIQnoiBO",
+				"name": "Modules",
+				"driver": "csv",
+				"socket": "iTechDevelopment_Charities/OSDCloudCodebaseDB/Modules.csv",
+				"driverOptions": {
+					"format": "auto"
+				},
+				"readOnly": false,
+				"role": "development",
+				"connectionType": "socket"
+			},
+			{
+				"connectionId": "ilFfSCq3h0cbQDffhTamD",
+				"name": "Issues",
+				"driver": "csv",
+				"socket": "iTechDevelopment_Charities/OSDCloudCodebaseDB/Issues.csv",
+				"driverOptions": {
+					"format": "auto"
+				},
+				"readOnly": false,
+				"role": "development",
+				"connectionType": "socket"
+			},
+			{
+				"connectionId": "WAciFH6S_9oIq03lkJaju",
+				"name": "Improvements",
+				"driver": "csv",
+				"socket": "iTechDevelopment_Charities/OSDCloudCodebaseDB/Improvements.csv",
+				"driverOptions": {
+					"format": "auto"
+				},
+				"readOnly": false,
+				"role": "development",
+				"connectionType": "socket"
+			}
+		]
 	}
 }

@@ -81,49 +81,42 @@ function Mount-WinPEImage {
         
         [Parameter(Mandatory=$true)]
         [ValidateNotNullOrEmpty()]
+        [ValidateScript({Test-Path -Path $_ -PathType Container})]
         [string]$MountPath,
         
         [Parameter()]
         [int]$Index = 1,
         
         [Parameter()]
-        [int]$MaxRetries = 3,
-        
-        [Parameter()]
-        [int]$TimeoutSec = 300
+        [int]$MaxRetries = 5
     )
     
-    # Get module configuration
-    $config = Get-ModuleConfiguration
-    $timeoutSec = $config.Timeouts.Mount
+    Write-OSDCloudLog -Message "Mounting WinPE image from $ImagePath to $MountPath" -Level Info -Component "Mount-WinPEImage"
     
-    Write-OSDCloudLog -Message "Mounting WinPE image $ImagePath to $MountPath (Index: $Index)" -Level Info -Component "Mount-WinPEImage"
-    
-    # Use Measure-OSDCloudOperation for telemetry
-    Measure-OSDCloudOperation -Name "Mount-WinPEImage" -ScriptBlock {
-        for ($i = 0; $i -lt $MaxRetries; $i++) {
-            try {
-                if ($PSCmdlet.ShouldProcess($ImagePath, "Mount Windows Image")) {
-                    Mount-WindowsImage -ImagePath $ImagePath -Index $Index -Path $MountPath -LogLevel 1
-                    Write-OSDCloudLog -Message "Successfully mounted WinPE image" -Level Info -Component "Mount-WinPEImage"
-                    return
-                }
+    for ($i = 0; $i -lt $MaxRetries; $i++) {
+        try {
+            if ($PSCmdlet.ShouldProcess($ImagePath, "Mount Windows image to $MountPath")) {
+                Mount-WindowsImage -ImagePath $ImagePath -Index $Index -Path $MountPath -ErrorAction Stop
+                Write-OSDCloudLog -Message "WinPE image mounted successfully" -Level Info -Component "Mount-WinPEImage"
+                return $true
             }
-            catch {
-                $retryMessage = "Attempt $($i+1) of $MaxRetries failed to mount WinPE image: $_"
-                Write-OSDCloudLog -Message $retryMessage -Level Warning -Component "Mount-WinPEImage"
-                
-                if ($i -eq $MaxRetries - 1) {
-                    $errorMessage = "Failed to mount WinPE image after $MaxRetries attempts: $_"
-                    Write-OSDCloudLog -Message $errorMessage -Level Error -Component "Mount-WinPEImage" -Exception $_.Exception
-                    throw
-                }
-                
-                # Add exponential backoff
-                $sleepTime = [Math]::Pow(2, $i) * 2
-                Write-OSDCloudLog -Message "Waiting $sleepTime seconds before retry..." -Level Info -Component "Mount-WinPEImage"
-                Start-Sleep -Seconds $sleepTime
+            return $false
+        }
+        catch {
+            # Log retry attempt
+            $retryMessage = "Attempt $($i+1) of $MaxRetries failed to mount WinPE image: $_"
+            Write-OSDCloudLog -Message $retryMessage -Level Warning -Component "Mount-WinPEImage"
+            
+            if ($i -eq $MaxRetries - 1) {
+                $errorMessage = "Failed to mount WinPE image after $MaxRetries attempts: $_"
+                Write-OSDCloudLog -Message $errorMessage -Level Error -Component "Mount-WinPEImage" -Exception $_.Exception
+                throw
             }
+            
+            # Add exponential backoff
+            $sleepTime = [Math]::Pow(2, $i) * 2
+            Write-OSDCloudLog -Message "Waiting $sleepTime seconds before retry..." -Level Info -Component "Mount-WinPEImage"
+            Start-Sleep -Seconds $sleepTime
         }
     }
 }
@@ -269,12 +262,17 @@ set "PATH=%PATH%;$escapedPath"
         Write-OSDCloudLog -Message $errorMessage -Level Error -Component "Update-WinPEStartup" -Exception $_.Exception
         
         # Restore backup if available
-        if (Test-Path -Path $backupPath) {
-            Copy-Item -Path $backupPath -Destination $startNetPath -Force
-            Write-OSDCloudLog -Message "Restored original startnet.cmd from backup" -Level Warning -Component "Update-WinPEStartup"
+        try {
+            if (Test-Path -Path $backupPath) {
+                Copy-Item -Path $backupPath -Destination $startNetPath -Force
+                Write-OSDCloudLog -Message "Restored backup of startnet.cmd" -Level Warning -Component "Update-WinPEStartup"
+            }
+        }
+        catch {
+            Write-OSDCloudLog -Message "Failed to restore backup of startnet.cmd: $_" -Level Error -Component "Update-WinPEStartup"
         }
         
-        return $false
+        throw
     }
 }
 
@@ -283,60 +281,78 @@ function Dismount-WinPEImage {
     param (
         [Parameter(Mandatory=$true)]
         [ValidateNotNullOrEmpty()]
+        [ValidateScript({Test-Path -Path $_ -PathType Container})]
         [string]$MountPath,
         
         [Parameter()]
-        [switch]$Save = $true,
+        [switch]$Discard,
         
         [Parameter()]
-        [int]$MaxRetries = 3,
-        
-        [Parameter()]
-        [switch]$Discard
+        [int]$MaxRetries = 5
     )
     
-    # Get module configuration
-    $config = Get-ModuleConfiguration
-    $timeoutSec = $config.Timeouts.Dismount
+    $saveChanges = -not $Discard
+    $saveMessage = if ($saveChanges) { "saving" } else { "discarding" }
     
-    # If Discard is specified, override Save
-    if ($Discard) {
-        $Save = $false
-    }
+    Write-OSDCloudLog -Message "Dismounting WinPE image from $MountPath ($saveMessage changes)" -Level Info -Component "Dismount-WinPEImage"
     
-    $saveText = if ($Save) { "saving changes" } else { "discarding changes" }
-    Write-OSDCloudLog -Message "Dismounting WinPE image from $MountPath ($saveText)" -Level Info -Component "Dismount-WinPEImage"
-    
-    # Use Measure-OSDCloudOperation for telemetry
-    Measure-OSDCloudOperation -Name "Dismount-WinPEImage" -ScriptBlock {
-        for ($i = 0; $i -lt $MaxRetries; $i++) {
-            try {
-                if ($PSCmdlet.ShouldProcess($MountPath, "Dismount Windows Image ($saveText)")) {
-                    Dismount-WindowsImage -Path $MountPath -Save:$Save -LogLevel 1
-                    Write-OSDCloudLog -Message "Successfully dismounted WinPE image" -Level Info -Component "Dismount-WinPEImage"
-                    return
-                }
+    for ($i = 0; $i -lt $MaxRetries; $i++) {
+        try {
+            if ($PSCmdlet.ShouldProcess($MountPath, "Dismount Windows image ($saveMessage changes)")) {
+                Dismount-WindowsImage -Path $MountPath -Save:$saveChanges -ErrorAction Stop
+                Write-OSDCloudLog -Message "WinPE image dismounted successfully" -Level Info -Component "Dismount-WinPEImage"
+                return $true
             }
-            catch {
-                $retryMessage = "Attempt $($i+1) of $MaxRetries failed to dismount WinPE image: $_"
-                Write-OSDCloudLog -Message $retryMessage -Level Warning -Component "Dismount-WinPEImage"
-                
-                if ($i -eq $MaxRetries - 1) {
-                    $errorMessage = "Failed to dismount WinPE image after $MaxRetries attempts: $_"
-                    Write-OSDCloudLog -Message $errorMessage -Level Error -Component "Dismount-WinPEImage" -Exception $_.Exception
-                    throw
-                }
-                
-                # Add exponential backoff
-                $sleepTime = [Math]::Pow(2, $i) * 2
-                Write-OSDCloudLog -Message "Waiting $sleepTime seconds before retry..." -Level Info -Component "Dismount-WinPEImage"
-                Start-Sleep -Seconds $sleepTime
+            return $false
+        }
+        catch {
+            # Log retry attempt
+            $retryMessage = "Attempt $($i+1) of $MaxRetries failed to dismount WinPE image: $_"
+            Write-OSDCloudLog -Message $retryMessage -Level Warning -Component "Dismount-WinPEImage"
+            
+            if ($i -eq $MaxRetries - 1) {
+                $errorMessage = "Failed to dismount WinPE image after $MaxRetries attempts: $_"
+                Write-OSDCloudLog -Message $errorMessage -Level Error -Component "Dismount-WinPEImage" -Exception $_.Exception
+                throw
             }
+            
+            # Add exponential backoff
+            $sleepTime = [Math]::Pow(2, $i) * 2
+            Write-OSDCloudLog -Message "Waiting $sleepTime seconds before retry..." -Level Info -Component "Dismount-WinPEImage"
+            Start-Sleep -Seconds $sleepTime
         }
     }
 }
 
-function Customize-WinPEWithPowerShell7 {
+function Update-WinPEWithPowerShell7 {
+    <#
+    .SYNOPSIS
+        Updates a WinPE image with PowerShell 7 support.
+    .DESCRIPTION
+        This function updates a WinPE image by adding PowerShell 7 support, configuring startup settings,
+        and updating environment variables. It handles the entire process of mounting the WIM file,
+        making modifications, and dismounting with changes saved.
+    .PARAMETER TempPath
+        The temporary path where working files will be stored.
+    .PARAMETER WorkspacePath
+        The workspace path containing the WinPE image to update.
+    .PARAMETER PowerShellVersion
+        The PowerShell version to install. Default is "7.3.4".
+    .PARAMETER PowerShell7File
+        The path to the PowerShell 7 zip file. If not specified, it will be downloaded.
+    .PARAMETER SkipCleanup
+        If specified, temporary files will not be removed after processing.
+    .EXAMPLE
+        Update-WinPEWithPowerShell7 -TempPath "C:\Temp\OSDCloud" -WorkspacePath "C:\OSDCloud\Workspace"
+    .EXAMPLE
+        Update-WinPEWithPowerShell7 -TempPath "C:\Temp\OSDCloud" -WorkspacePath "C:\OSDCloud\Workspace" -PowerShellVersion "7.3.4"
+    .EXAMPLE
+        Update-WinPEWithPowerShell7 -TempPath "C:\Temp\OSDCloud" -WorkspacePath "C:\OSDCloud\Workspace" -PowerShell7File "C:\Temp\PowerShell-7.3.4-win-x64.zip"
+    .EXAMPLE
+        Update-WinPEWithPowerShell7 -TempPath "C:\Temp\OSDCloud" -WorkspacePath "C:\OSDCloud\Workspace" -SkipCleanup
+    .NOTES
+        This function requires administrator privileges and the Windows ADK installed.
+    #>
     [CmdletBinding(SupportsShouldProcess=$true)]
     param (
         [Parameter(Mandatory=$true)]
@@ -357,29 +373,95 @@ function Customize-WinPEWithPowerShell7 {
         [string]$PowerShellVersion = "7.3.4",
         
         [Parameter()]
-        [string]$PowerShell7File
+        [string]$PowerShell7File,
+        
+        [Parameter()]
+        [switch]$SkipCleanup
     )
     
-    # This function is kept for backward compatibility
-    # It redirects to Update-WinPEWithPowerShell7
+    Write-OSDCloudLog -Message "Starting WinPE customization with PowerShell $PowerShellVersion" -Level Info -Component "Update-WinPEWithPowerShell7"
     
-    Write-OSDCloudLog -Message "Customize-WinPEWithPowerShell7 is deprecated. Using Update-WinPEWithPowerShell7 instead." -Level Warning -Component "Customize-WinPEWithPowerShell7"
-    
-    $params = @{
-        TempPath = $TempPath
-        WorkspacePath = $WorkspacePath
-        PowerShellVersion = $PowerShellVersion
+    try {
+        # Step 1: Initialize WinPE mount point
+        Write-OSDCloudLog -Message "Initializing mount points" -Level Info -Component "Update-WinPEWithPowerShell7"
+        $mountInfo = Initialize-WinPEMountPoint -TempPath $TempPath
+        $mountPoint = $mountInfo.MountPoint
+        $ps7TempPath = $mountInfo.PS7TempPath
+        
+        # Step 2: Get PowerShell 7 package if not provided
+        if (-not $PowerShell7File) {
+            Write-OSDCloudLog -Message "PowerShell 7 package not provided, attempting to download" -Level Info -Component "Update-WinPEWithPowerShell7"
+            $PowerShell7File = Get-PowerShell7Package -Version $PowerShellVersion -DownloadPath (Join-Path -Path $ps7TempPath -ChildPath "PowerShell-$PowerShellVersion-win-x64.zip")
+        }
+        
+        # Step 3: Locate boot.wim in the workspace
+        $bootWimPath = Join-Path -Path $WorkspacePath -ChildPath "Media\Sources\boot.wim"
+        if (-not (Test-Path -Path $bootWimPath)) {
+            throw "Boot.wim not found at expected path: $bootWimPath"
+        }
+        
+        # Step 4: Mount the WinPE image
+        Write-OSDCloudLog -Message "Mounting boot.wim" -Level Info -Component "Update-WinPEWithPowerShell7"
+        if ($PSCmdlet.ShouldProcess($bootWimPath, "Mount to $mountPoint")) {
+            Mount-WinPEImage -ImagePath $bootWimPath -MountPath $mountPoint -Index 1
+            
+            # Step 5: Install PowerShell 7 to the mounted WinPE image
+            Write-OSDCloudLog -Message "Installing PowerShell 7 to WinPE" -Level Info -Component "Update-WinPEWithPowerShell7"
+            Install-PowerShell7ToWinPE -PowerShell7File $PowerShell7File -TempPath $ps7TempPath -MountPoint $mountPoint
+            
+            # Step 6: Update registry settings for PowerShell 7
+            Write-OSDCloudLog -Message "Updating WinPE registry settings" -Level Info -Component "Update-WinPEWithPowerShell7"
+            Update-WinPERegistry -MountPoint $mountPoint -PowerShell7Path "X:\Windows\System32\PowerShell7"
+            
+            # Step 7: Create PowerShell 7 startup profile
+            Write-OSDCloudLog -Message "Creating WinPE startup profile" -Level Info -Component "Update-WinPEWithPowerShell7"
+            New-WinPEStartupProfile -MountPoint $mountPoint
+            
+            # Step 8: Update WinPE startup script to use PowerShell 7
+            Write-OSDCloudLog -Message "Updating WinPE startup script" -Level Info -Component "Update-WinPEWithPowerShell7"
+            Update-WinPEStartup -MountPoint $mountPoint -PowerShell7Path "X:\Windows\System32\PowerShell7"
+            
+            # Step 9: Dismount the WinPE image and save changes
+            Write-OSDCloudLog -Message "Dismounting boot.wim and saving changes" -Level Info -Component "Update-WinPEWithPowerShell7"
+            Dismount-WinPEImage -MountPath $mountPoint
+            
+            Write-OSDCloudLog -Message "WinPE image successfully updated with PowerShell 7" -Level Info -Component "Update-WinPEWithPowerShell7"
+        }
+        
+        # Clean up temporary files if needed
+        if (-not $SkipCleanup) {
+            try {
+                Write-OSDCloudLog -Message "Cleaning up temporary files" -Level Info -Component "Update-WinPEWithPowerShell7"
+                Remove-Item -Path $mountPoint -Recurse -Force -ErrorAction SilentlyContinue
+                Remove-Item -Path $ps7TempPath -Recurse -Force -ErrorAction SilentlyContinue
+            }
+            catch {
+                Write-OSDCloudLog -Message "Warning: Failed to clean up temporary files: $_" -Level Warning -Component "Update-WinPEWithPowerShell7"
+            }
+        }
+        
+        return $bootWimPath
     }
-    
-    if ($PowerShell7File) {
-        $params.PowerShell7File = $PowerShell7File
+    catch {
+        # Clean up on error
+        try {
+            if (Test-Path -Path $mountPoint -PathType Container) {
+                Write-OSDCloudLog -Message "Error occurred. Attempting to dismount image." -Level Warning -Component "Update-WinPEWithPowerShell7"
+                Dismount-WinPEImage -MountPath $mountPoint -Discard
+            }
+        }
+        catch {
+            Write-OSDCloudLog -Message "Failed to perform cleanup after error: $_" -Level Error -Component "Update-WinPEWithPowerShell7"
+        }
+        
+        $errorMessage = "Failed to update WinPE with PowerShell 7: $_"
+        Write-OSDCloudLog -Message $errorMessage -Level Error -Component "Update-WinPEWithPowerShell7" -Exception $_.Exception
+        throw $errorMessage
     }
-    
-    return Update-WinPEWithPowerShell7 @params
 }
 
-# For backward compatibility
-Set-Alias -Name Update-WinPEWithPowerShell7 -Value Customize-WinPEWithPowerShell7
+# For backward compatibility - FIXED: Correctly set the old name as alias to the new name
+Set-Alias -Name Customize-WinPEWithPowerShell7 -Value Update-WinPEWithPowerShell7
 
 # Export all functions and aliases
 Export-ModuleMember -Function * -Alias *
