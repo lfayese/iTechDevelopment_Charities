@@ -1,4 +1,4 @@
-function Measure-FunctionPerformance {
+function Measure-OSDCloudOperation {
     [CmdletBinding()]
     param (
         [Parameter(Mandatory = $true)]
@@ -9,20 +9,8 @@ function Measure-FunctionPerformance {
         
         [Parameter(Mandatory = $false)]
         [object[]]$ArgumentList = @(),
-
         [Parameter(Mandatory = $false)]
         [int]$WarningThresholdMs = 1000
-    )
-    [CmdletBinding()]
-    param (
-        [Parameter(Mandatory = $true)]
-        [string]$Name,
-        
-        [Parameter(Mandatory = $true)]
-        [scriptblock]$ScriptBlock,
-        
-        [Parameter(Mandatory = $false)]
-        [object[]]$ArgumentList = @()
     )
     
     $telemetryEnabled = $true
@@ -54,11 +42,15 @@ function Measure-FunctionPerformance {
         $endTime = Get-Date
         $duration = ($endTime - $startTime).TotalMilliseconds
         
+        # Check if duration exceeds warning threshold
+        if ($duration -gt $WarningThresholdMs) {
+            Write-Warning "Operation '$Name' took longer than expected: $duration ms"
+        }
+        
         # Log telemetry if enabled
         if ($telemetryEnabled) {
             $endMemory = [System.GC]::GetTotalMemory($false)
             $memoryDelta = $endMemory - $startMemory
-
             $telemetryData = @{
                 Operation = $Name
                 Duration = $duration
@@ -69,33 +61,15 @@ function Measure-FunctionPerformance {
                 MemoryUsageDeltaMB = [math]::Round($memoryDelta / 1MB, 2)
             }
             
-            # Log locally
-            $telemetryDir = Join-Path -Path $env:TEMP -ChildPath "OSDCloudCustomBuilder\Telemetry"
-            if (-not (Test-Path -Path $telemetryDir)) {
-                New-Item -Path $telemetryDir -ItemType Directory -Force | Out-Null
-            }
-            
-            $telemetryFile = Join-Path -Path $telemetryDir -ChildPath "performance_$(Get-Date -Format 'yyyyMMdd').json"
-            
-            try {
-                if (Test-Path -Path $telemetryFile) {
-                    $existingData = Get-Content -Path $telemetryFile -Raw | ConvertFrom-Json
-                    $existingData += $telemetryData
-                    $existingData | ConvertTo-Json | Set-Content -Path $telemetryFile
-                }
-                else {
-                    @($telemetryData) | ConvertTo-Json | Set-Content -Path $telemetryFile
-                }
-            }
-            catch {
-                Write-Warning "Failed to write telemetry data: $_"
-            }
-            
             # Log performance data
             Write-OSDCloudLog -Message "Operation '$Name' completed in $duration ms (Success: $success)" -Level $(if ($success) { 'Debug' } else { 'Warning' }) -Component 'Performance'
+            
+            # Add performance log entry
+            Add-PerformanceLogEntry -OperationName $Name -DurationMs $duration -Outcome $(if ($success) { 'Success' } else { 'Failure' }) -ResourceUsage @{
+                MemoryDeltaMB = $telemetryData.MemoryUsageDeltaMB
+            } -AdditionalData $telemetryData
         }
     }
 }
-
 # Export the function
 Export-ModuleMember -Function Measure-OSDCloudOperation
