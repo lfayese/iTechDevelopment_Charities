@@ -1,168 +1,157 @@
-<#
-.SYNOPSIS
-    Measures and logs performance metrics for OSDCloud operations.
-.DESCRIPTION
-    This function wraps a scriptblock with performance measurement code to track
-    execution time, memory usage, and success/failure status. It provides detailed
-    performance telemetry and can issue warnings when operations exceed specified
-    duration thresholds. The function supports passing arguments to the scriptblock
-    and handles exceptions properly.
-.PARAMETER Name
-    A descriptive name for the operation being measured. This name is used in logs
-    and telemetry data.
-.PARAMETER ScriptBlock
-    The scriptblock containing the operation code to execute and measure.
-.PARAMETER ArgumentList
-    An optional array of arguments to pass to the scriptblock.
-.PARAMETER WarningThresholdMs
-    The threshold in milliseconds above which a warning will be logged.
-    Default is 1000ms (1 second).
-.PARAMETER DisableTelemetry
-    If specified, disables telemetry logging for this operation.
-.EXAMPLE
-    Measure-OSDCloudOperation -Name "Copy WIM File" -ScriptBlock {
-        Copy-Item -Path $source -Destination $target
-    }
-    Measures the performance of a simple file copy operation.
-.EXAMPLE
-    Measure-OSDCloudOperation -Name "Mount WIM" -ScriptBlock {
-        param($path, $mountPoint)
-        Mount-WindowsImage -ImagePath $path -Path $mountPoint -Index 1
-    } -ArgumentList @("C:\install.wim", "C:\mount") -WarningThresholdMs 5000
-    Measures a WIM mounting operation with arguments and a custom warning threshold.
-.NOTES
-    The function requires Write-OSDCloudLog and Add-PerformanceLogEntry to be available
-    for logging telemetry data.
-#>
 function Measure-OSDCloudOperation {
     [CmdletBinding()]
     param (
         [Parameter(Mandatory = $true, Position = 0)]
         [ValidateNotNullOrEmpty()]
         [string]$Name,
-        
         [Parameter(Mandatory = $true, Position = 1)]
         [ValidateNotNull()]
         [scriptblock]$ScriptBlock,
-        
         [Parameter(Mandatory = $false)]
         [object[]]$ArgumentList = @(),
-        
         [Parameter(Mandatory = $false)]
         [ValidateRange(1, [int]::MaxValue)]
         [int]$WarningThresholdMs = 1000,
-        
         [Parameter(Mandatory = $false)]
-        [switch]$DisableTelemetry
+        [switch]$DisableTelemetry,
+        [Parameter(Mandatory = $false)]
+        [switch]$CollectDetailed
     )
-    
-    # Determine if telemetry is enabled based on parameter and/or configuration
+    # Determine telemetry enabled
     $telemetryEnabled = -not $DisableTelemetry
+    $telemetryConfig = @{}
     
+    # Cache command existence for configuration
+    $cmdGetModuleConfig = Get-Command -Name Get-ModuleConfiguration -ErrorAction SilentlyContinue
     try {
-        # Get configuration if available
-        if (Get-Command -Name Get-ModuleConfiguration -ErrorAction SilentlyContinue) {
+        if ($cmdGetModuleConfig) {
             $config = Get-ModuleConfiguration
-            # If telemetry is explicitly disabled in config, honor that setting
-            if ($config.ContainsKey('Telemetry') -and 
-                $config.Telemetry.ContainsKey('Enabled') -and 
-                $config.Telemetry.Enabled -eq $false) {
+            if ( $config.ContainsKey('Telemetry') -and
+                 $config.Telemetry.ContainsKey('Enabled') -and 
+                 $config.Telemetry.Enabled -eq $false) {
                 $telemetryEnabled = $false
+            }
+            if ($config.ContainsKey('Telemetry')) {
+                $telemetryConfig = $config.Telemetry
             }
         }
     }
     catch {
-        # If we can't get config, just continue with default telemetry setting
         Write-Verbose "Could not retrieve module configuration: $_"
     }
-    
-    # Start timing and memory tracking
-    $startTime = Get-Date
+    # Use Stopwatch for precise timing
+    $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+    # Capture initial memory and process metrics
     $startMemory = [System.GC]::GetTotalMemory($false)
+    $process = Get-Process -Id $PID
+    $startCPU = $process.CPU
+    $startHandles = $process.HandleCount
     $success = $false
     $errorMessage = $null
     $exception = $null
-    
+    # Cache logging commands for faster lookup later.
+    $cmdWriteLog = Get-Command -Name Write-OSDCloudLog -ErrorAction SilentlyContinue
+    $cmdSendTelemetry = Get-Command -Name Send-OSDCloudTelemetry -ErrorAction SilentlyContinue
+    $cmdAddPerfLog = Get-Command -Name Add-PerformanceLogEntry -ErrorAction SilentlyContinue
     try {
-        # Log operation start if telemetry is enabled
-        if ($telemetryEnabled) {
+        if ($telemetryEnabled -and $cmdWriteLog) {
             try {
                 Write-OSDCloudLog -Message "Starting operation: '$Name'" -Level Debug -Component 'Performance'
             }
             catch {
-                # Don't fail if logging fails
                 Write-Verbose "Failed to log operation start: $_"
             }
         }
-        
-        # Execute the operation
-        $result = if ($ArgumentList.Count -gt 0) {
-            & $ScriptBlock @ArgumentList
-        }
-        else {
-            & $ScriptBlock
-        }
-        
+        # Execute the operation with or without parameters
+        $result = if ($ArgumentList.Count -gt 0) { & $ScriptBlock @ArgumentList } else { & $ScriptBlock }
         $success = $true
         return $result
     }
     catch {
         $errorMessage = $_.Exception.Message
         $exception = $_
-        # Re-throw the exception to maintain proper error handling
         throw
     }
     finally {
-        # Calculate duration
-        $endTime = Get-Date
-        $duration = ($endTime - $startTime).TotalMilliseconds
-        
-        # Check if duration exceeds warning threshold
-        if ($duration -gt $WarningThresholdMs) {
-            Write-Warning "Operation '$Name' took longer than expected: $($duration.ToString('N2')) ms (threshold: $WarningThresholdMs ms)"
+        $stopwatch.Stop()
+        $duration = $stopwatch.Elapsed.TotalMilliseconds
+        # Memory usage after execution
+        $endMemory = [System.GC]::GetTotalMemory($false)
+        $memoryDelta = $endMemory - $startMemory
+        # Refresh process to get the latest metrics
+        try {
+            $process.Refresh()
+            $cpuDelta = if ($process.CPU -gt $startCPU) { $process.CPU - $startCPU } else { 0 }
+            $handleDelta = $process.HandleCount - $startHandles
+            $processMetrics = @{
+                CPUDelta = [math]::Round($cpuDelta, 2)
+                HandleDelta = $handleDelta
+                Threads = $process.Threads.Count
+                WorkingSet = [math]::Round($process.WorkingSet64 / 1MB, 2)
+            }
         }
-        
-        # Log telemetry if enabled
+        catch {
+            Write-Verbose "Failed to capture detailed process metrics: $_"
+            $processMetrics = @{}
+        }
+        if ($duration -gt $WarningThresholdMs) {
+            Write-Warning "Operation '$Name' took longer than expected: $([math]::Round($duration,2).ToString('N2')) ms (threshold: $WarningThresholdMs ms)"
+        }
         if ($telemetryEnabled) {
             try {
-                $endMemory = [System.GC]::GetTotalMemory($false)
-                $memoryDelta = $endMemory - $startMemory
                 $telemetryData = @{
                     Operation = $Name
                     Duration = [math]::Round($duration, 2)
                     Success = $success
-                    Timestamp = $startTime.ToString('o')
-                    Error = $errorMessage
-                    MemoryUsageDelta = $memoryDelta
-                    MemoryUsageDeltaMB = [math]::Round($memoryDelta / 1MB, 2)
+                    Timestamp = (Get-Date -Date $stopwatch.Elapsed -UFormat '%Y-%m-%dT%H:%M:%S.000Z')
+                    MemoryDeltaMB = [math]::Round($memoryDelta / 1MB, 2)
                 }
-                
-                # Log performance data
+                if (-not $success -and $errorMessage) {
+                    $telemetryData['Error'] = $errorMessage
+                    if ($exception -and $exception.ScriptStackTrace) {
+                        $cleanStackTrace = $exception.ScriptStackTrace -replace '([A-Za-z]:\\Users\\[^\\]+)', '<User>'
+                        $telemetryData['StackTrace'] = $cleanStackTrace
+                    }
+                }
+                $detailLevel = if ($telemetryConfig.ContainsKey('DetailLevel')) { $telemetryConfig.DetailLevel } else { 'Standard' }
+                $collectDetails = $CollectDetailed -or ($detailLevel -eq 'Detailed')
+                if ($collectDetails) {
+                    $telemetryData['ProcessMetrics'] = $processMetrics
+                    try {
+                        $cpuLoad = (Get-CimInstance -ClassName Win32_Processor | Measure-Object -Property LoadPercentage -Average).Average
+                        $memoryInfo = Get-CimInstance -ClassName Win32_OperatingSystem
+                        $memoryLoad = [math]::Round((($memoryInfo.TotalVisibleMemorySize - $memoryInfo.FreePhysicalMemory) / $memoryInfo.TotalVisibleMemorySize) * 100, 2)
+                        $telemetryData['SystemLoad'] = @{
+                            CPULoad = $cpuLoad
+                            MemoryLoad = $memoryLoad
+                        }
+                    }
+                    catch {
+                        Write-Verbose "Failed to capture system load metrics: $_"
+                    }
+                }
                 $logLevel = if ($success) { 'Debug' } else { 'Warning' }
-                $logMessage = "Operation '$Name' completed in $($duration.ToString('N2')) ms (Success: $success)"
+                $logMessage = "Operation '$Name' completed in $([math]::Round($duration,2).ToString('N2')) ms (Success: $success)"
                 if (-not $success -and $errorMessage) {
                     $logMessage += ", Error: $errorMessage"
                 }
-                
-                Write-OSDCloudLog -Message $logMessage -Level $logLevel -Component 'Performance' -Exception $(if (-not $success) { $exception } else { $null })
-                
-                # Add performance log entry if the function is available
-                if (Get-Command -Name Add-PerformanceLogEntry -ErrorAction SilentlyContinue) {
+                if ($cmdWriteLog) {
+                    Write-OSDCloudLog -Message $logMessage -Level $logLevel -Component 'Performance' -Exception $(if (-not $success) { $exception } else { $null })
+                }
+                if ($cmdSendTelemetry) {
+                    Send-OSDCloudTelemetry -OperationName $Name -TelemetryData $telemetryData | Out-Null
+                }
+                elseif ($cmdAddPerfLog) {
                     Add-PerformanceLogEntry -OperationName $Name -DurationMs $duration -Outcome $(if ($success) { 'Success' } else { 'Failure' }) -ResourceUsage @{
-                        MemoryDeltaMB = $telemetryData.MemoryUsageDeltaMB
+                        MemoryDeltaMB = $telemetryData.MemoryDeltaMB
                     } -AdditionalData $telemetryData
                 }
             }
             catch {
-                # Don't fail if telemetry logging fails
                 Write-Verbose "Failed to log performance telemetry: $_"
             }
         }
-        
-        # Force garbage collection to clean up resources
-        [System.GC]::Collect()
+        # Removed forced garbage collection to avoid unnecessary performance overhead.
     }
 }
-
-# Export the function
 Export-ModuleMember -Function Measure-OSDCloudOperation

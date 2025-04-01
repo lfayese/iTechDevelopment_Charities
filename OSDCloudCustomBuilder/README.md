@@ -20,6 +20,8 @@ This solution enables you to:
 - Leverage PowerShell 7 for enhanced deployment capabilities
 - Utilize enhanced security features with package verification and TLS 1.2
 - Take advantage of performance optimizations with parallel processing
+- Collect optional telemetry to identify issues in production environments
+- Generate comprehensive documentation from code comments
 
 ## Prerequisites
 
@@ -46,6 +48,13 @@ This solution enables you to:
     - `Update-CustomWimWithPwsh7`: Adds PowerShell 7 and custom WIM files to OSDCloud environment
     - `New-CustomOSDCloudISO`: Creates bootable ISO with the custom configuration
     - `Set-OSDCloudCustomBuilderConfig`: Configures module settings for customization
+    - `Set-OSDCloudTelemetry`: Configures telemetry options for troubleshooting
+    - `ConvertTo-OSDCloudDocumentation`: Generates documentation from code comments
+  - `/Examples`: Sample scripts demonstrating key functionality
+    - `Create-CustomISOWithTelemetry.ps1`: Creates a custom ISO with telemetry enabled
+    - `Generate-ModuleDocumentation.ps1`: Generates comprehensive documentation
+    - `Analyze-TelemetryData.ps1`: Analyzes telemetry data to identify issues
+    - `Export-TelemetryData.ps1`: Exports telemetry for external analysis
 
 ## Getting Started
 
@@ -93,7 +102,19 @@ Get-Module OSDCloudCustomBuilder -ListAvailable
    Set-OSDCloudCustomBuilderConfig -DefaultPowerShellVersion "7.5.0" -MountTimeout 600
    ```
 
-4. **Verbose Logging**
+4. **Enable Telemetry (Optional)**
+   Configure telemetry to help identify issues in production environments:
+   ```powershell
+   Set-OSDCloudTelemetry -Enable $true -DetailLevel Standard
+   ```
+
+5. **Generate Documentation**
+   Create comprehensive documentation from code comments:
+   ```powershell
+   ConvertTo-OSDCloudDocumentation -IncludePrivateFunctions -GenerateExampleFiles
+   ```
+
+6. **Verbose Logging**
    All operations now include structured logging with timestamps for easier troubleshooting. Example log format:
    ```
    [2025-03-31 10:00:00] [INFO] [OSDCloudCustomBuilder] Starting Update-CustomWimWithPwsh7
@@ -216,6 +237,83 @@ Available configuration options:
 - `-CachePath`: Specify custom path for caching downloaded packages
 - `-TempPath`: Specify custom path for temporary files
 
+## Telemetry and Metrics
+
+The module includes an optional telemetry system to help identify issues in production environments:
+
+### Configuring Telemetry
+
+Control what data is collected and where it's stored:
+
+```powershell
+# Enable telemetry with standard detail level
+Set-OSDCloudTelemetry -Enable $true -DetailLevel Standard
+
+# Collect detailed metrics for advanced troubleshooting
+Set-OSDCloudTelemetry -DetailLevel Detailed -StoragePath "D:\OSDTelemetry"
+
+# Disable telemetry collection
+Set-OSDCloudTelemetry -Enable $false
+```
+
+### Telemetry Detail Levels
+
+- **Basic**: Collects only operation names, duration, and success/failure status
+- **Standard**: Adds memory usage and error details (default)
+- **Detailed**: Adds system information and detailed metrics for advanced troubleshooting
+
+### Analyzing Telemetry Data
+
+The Examples directory includes scripts to analyze telemetry data:
+
+```powershell
+# Analyze telemetry to identify issues
+.\Examples\Analyze-TelemetryData.ps1
+
+# Export telemetry for further analysis
+.\Examples\Export-TelemetryData.ps1 -OutputFolder "D:\Exports" -ExportFormat CSV,HTML
+```
+
+### Privacy and Data Retention
+
+- No personally identifiable information (PII) is collected
+- All telemetry is stored locally by default
+- Remote telemetry upload is disabled by default and requires explicit opt-in
+- Telemetry data is automatically cleaned up after 90 days (configurable)
+- Stack traces are automatically sanitized to remove user paths
+
+## Documentation Generation
+
+The module includes a comprehensive documentation generator that creates markdown documentation from PowerShell comment-based help.
+
+### Generating Documentation
+
+Create complete documentation including function references, examples, and parameter details:
+
+```powershell
+# Generate basic documentation
+ConvertTo-OSDCloudDocumentation
+
+# Include private functions and generate example files
+ConvertTo-OSDCloudDocumentation -IncludePrivateFunctions -GenerateExampleFiles
+
+# Use a custom README template
+ConvertTo-OSDCloudDocumentation -ReadmeTemplate "path\to\template.md"
+```
+
+### Documentation Features
+
+- Automatically creates function reference documentation for all public functions
+- Optionally includes internal/private functions for developer reference
+- Extracts examples from comment-based help into runnable script files
+- Generates parameter details including type, default values, and validation
+- Creates formatted markdown that renders well in GitHub and other platforms
+- Builds a hierarchical documentation structure with the index, function references, and examples
+
+### Example Script Generation
+
+When the `-GenerateExampleFiles` parameter is used, the documentation generator extracts example code from function documentation into separate, runnable PowerShell scripts in the 'examples' directory.
+
 ## Development and Testing
 
 ### Running Tests
@@ -265,6 +363,8 @@ The repository is structured to provide a complete Windows deployment solution:
    - Verifies package integrity with hash validation
    - Implements secure TLS 1.2 communication
    - Caches downloaded packages for improved performance
+   - Collects optional telemetry to identify issues
+   - Generates comprehensive documentation from code
 
 2. **OSDCloud** provides the deployment experience:
    - Detects custom WIM files created by OSDCloudCustomBuilder
@@ -310,6 +410,25 @@ Key configuration elements include:
 - Custom WIM detection and integration
 - Hardware compatibility checks
 
+### Telemetry Configuration
+
+The telemetry system can be customized to meet specific organizational needs:
+
+```powershell
+# Configure telemetry storage and retention
+Set-OSDCloudTelemetry -StoragePath "D:\Telemetry" 
+
+# Configure telemetry data retention (add to your scheduled tasks)
+Get-ChildItem -Path "D:\Telemetry" -Filter *.json |
+    Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-90) } |
+    Remove-Item -Force
+```
+
+The module includes automatic telemetry data sanitization to ensure no sensitive information is collected:
+- User paths are automatically replaced with `<User>` placeholder
+- System-specific identifiers are anonymized
+- Error messages are preserved for troubleshooting but sanitized of PII
+
 ### PowerShell 7 Integration
 
 The solution includes PowerShell 7 support for enhanced deployment capabilities:
@@ -345,8 +464,13 @@ The module includes several performance optimizations:
   - WinPE Phase: Logs are stored in `X:\\OSDCloud\\Logs`
   - Windows Phase: Logs are stored in `C:\\Windows\\Logs\\OSDCloud`
   - Module logs: Stored in `%TEMP%\\OSDCloudCustomBuilder\\Logs`
+  - Telemetry data: Stored in the configured telemetry path or `<ModuleRoot>\\Logs\\Telemetry` by default
 - **Custom WIM Not Detected**: Verify the custom.wim file is placed in one of the supported locations. The deployment interface searches multiple locations and connected USB drives.
 - **Package Verification Failures**: If hash verification fails, try clearing the cache or updating the hash values with `Set-OSDCloudCustomBuilderConfig`
+- **Analyzing Performance Issues**: Use the telemetry analysis tools to identify bottlenecks:
+  ```powershell
+  .\Examples\Analyze-TelemetryData.ps1
+  ```
 
 ## Support and Contribution
 
@@ -358,3 +482,4 @@ For issues or questions, please contact the repository maintainers. Contribution
 - [OSDCloud Documentation](https://www.osdcloud.com)
 - [PowerShell 7 Documentation](https://docs.microsoft.com/en-us/powershell/)
 - [Windows Autopilot Documentation](https://docs.microsoft.com/en-us/windows/deployment/windows-autopilot/windows-autopilot)
+- [PowerShell Comment-Based Help](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_comment_based_help)

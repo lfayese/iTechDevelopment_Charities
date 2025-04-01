@@ -1,4 +1,4 @@
-<#
+<# 
 .SYNOPSIS
     Creates an OSDCloud ISO with a custom Windows Image (WIM) file and PowerShell 7 support.
 .DESCRIPTION
@@ -51,19 +51,15 @@ function Update-CustomWimWithPwsh7 {
             return $true
         })]
         [string]$WimPath,
-        
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
         [string]$OutputPath,
-        
         [Parameter()]
         [ValidateNotNullOrEmpty()]
         [string]$ISOFileName = "OSDCloudCustomWIM.iso",
-        
         [Parameter()]
         [ValidateNotNullOrEmpty()]
         [string]$TempPath = "$env:TEMP\OSDCloudCustomBuilder",
-        
         [Parameter()]
         [ValidateScript({
             if (Test-ValidPowerShellVersion -Version $_) { 
@@ -72,16 +68,12 @@ function Update-CustomWimWithPwsh7 {
             throw "Invalid PowerShell version format. Must be in X.Y.Z format and be a supported version."
         })]
         [string]$PowerShellVersion = "7.3.4",
-        
         [Parameter()]
         [switch]$IncludeWinRE,
-        
         [Parameter()]
         [switch]$SkipCleanup,
-        
         [Parameter()]
         [int]$TimeoutMinutes = 60,
-        
         [Parameter()]
         [int]$MaxThreads = 4
     )
@@ -222,16 +214,19 @@ function Update-CustomWimWithPwsh7 {
                 Write-OSDCloudLog -Message $errorMessage -Level Error -Component "Update-CustomWimWithPwsh7" -Exception $_.Exception
                 throw "Failed during operation '$currentOperation': $_"
             }
+            # Define a helper function for module import inside job script blocks
+            $jobImportModule = {
+                param($wsPath)
+                $modulePath = Join-Path -Path (Split-Path -Path $wsPath -Parent) -ChildPath "..\OSDCloudCustomBuilder.psm1"
+                if (-not (Get-Module -Name OSDCloudCustomBuilder)) {
+                    Import-Module $modulePath -Force -ErrorAction Stop
+                }
+            }
             # Define script blocks for background tasks.
-            # Note: To reduce repeated module imports, if the module is light you might pre-import it in the global runspace and pass functions via $using: scope.
             $ps7CustomizationScript = {
-                param($tempPath, $workspacePath, $psVersion, $ps7PackagePath)
+                param($tempPath, $workspacePath, $psVersion, $ps7PackagePath, $jobImportModule)
                 try {
-                    $modulePath = Join-Path -Path (Split-Path -Path $workspacePath -Parent) -ChildPath "..\OSDCloudCustomBuilder.psm1"
-                    # Only import if not already loaded in the current runspace
-                    if (-not (Get-Module -Name OSDCloudCustomBuilder)) {
-                        Import-Module $modulePath -Force -ErrorAction Stop
-                    }
+                    & $jobImportModule $workspacePath
                     Update-WinPEWithPowerShell7 -TempPath $tempPath -WorkspacePath $workspacePath -PowerShellVersion $psVersion -PowerShell7File $ps7PackagePath -ErrorAction Stop
                     return @{ Success = $true; Message = "PowerShell 7 customization completed successfully" }
                 }
@@ -240,12 +235,9 @@ function Update-CustomWimWithPwsh7 {
                 }
             }
             $isoOptimizationScript = {
-                param($workspacePath)
+                param($workspacePath, $jobImportModule)
                 try {
-                    $modulePath = Join-Path -Path (Split-Path -Path $workspacePath -Parent) -ChildPath "..\OSDCloudCustomBuilder.psm1"
-                    if (-not (Get-Module -Name OSDCloudCustomBuilder)) {
-                        Import-Module $modulePath -Force -ErrorAction Stop
-                    }
+                    & $jobImportModule $workspacePath
                     Optimize-ISOSize -WorkspacePath $workspacePath -ErrorAction Stop
                     return @{ Success = $true; Message = "ISO size optimization completed successfully" }
                 }
@@ -261,8 +253,8 @@ function Update-CustomWimWithPwsh7 {
             if ($useThreadJobs) {
                 Write-OSDCloudLog -Message "Using ThreadJob for parallel processing" -Level Info -Component "Update-CustomWimWithPwsh7"
                 try {
-                    $jobs += Start-ThreadJob -ScriptBlock $ps7CustomizationScript -ArgumentList $tempWorkspacePath, $workspacePath, $PowerShellVersion, $ps7PackagePath
-                    $jobs += Start-ThreadJob -ScriptBlock $isoOptimizationScript -ArgumentList $workspacePath
+                    $jobs += Start-ThreadJob -ScriptBlock $ps7CustomizationScript -ArgumentList $tempWorkspacePath, $workspacePath, $PowerShellVersion, $ps7PackagePath, $jobImportModule
+                    $jobs += Start-ThreadJob -ScriptBlock $isoOptimizationScript -ArgumentList $workspacePath, $jobImportModule
                 }
                 catch {
                     $warningMessage = "Error starting ThreadJob: $_. Falling back to standard Jobs."
@@ -274,8 +266,8 @@ function Update-CustomWimWithPwsh7 {
             if (-not $useThreadJobs -or $jobs.Count -eq 0) {
                 Write-OSDCloudLog -Message "Using standard Jobs for parallel processing" -Level Info -Component "Update-CustomWimWithPwsh7"
                 try {
-                    $jobs += Start-Job -ScriptBlock $ps7CustomizationScript -ArgumentList $tempWorkspacePath, $workspacePath, $PowerShellVersion, $ps7PackagePath
-                    $jobs += Start-Job -ScriptBlock $isoOptimizationScript -ArgumentList $workspacePath
+                    $jobs += Start-Job -ScriptBlock $ps7CustomizationScript -ArgumentList $tempWorkspacePath, $workspacePath, $PowerShellVersion, $ps7PackagePath, $jobImportModule
+                    $jobs += Start-Job -ScriptBlock $isoOptimizationScript -ArgumentList $workspacePath, $jobImportModule
                 }
                 catch {
                     $errorMessage = "Failed to create background jobs: $_"
@@ -348,7 +340,7 @@ function Update-CustomWimWithPwsh7 {
             }
             Write-Host "✅ ISO created successfully at: $OutputPath" -ForegroundColor Green
             Write-OSDCloudLog -Message "ISO created successfully at: $OutputPath" -Level Info -Component "Update-CustomWimWithPwsh7"
-            [System.GC]::Collect()
+            # Removed manual [System.GC]::Collect() call
         }
         catch {
             $errorMessage = "An error occurred during '$currentOperation': $_"

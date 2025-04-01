@@ -32,80 +32,95 @@ function Invoke-OSDCloudLogger {
     param(
         [Parameter(Mandatory = $true, Position = 0)]
         [string]$Message,
-        
         [Parameter(Position = 1)]
         [ValidateSet('Info', 'Warning', 'Error', 'Debug', 'Verbose')]
         [string]$Level = 'Info',
-        
         [Parameter(Position = 2)]
         [string]$Component = 'OSDCloudCustomBuilder',
-        
         [Parameter()]
         [string]$LogFile,
-        
         [Parameter()]
         [switch]$NoConsole,
-        
         [Parameter()]
         [System.Exception]$Exception
     )
-    
     begin {
-        # Get configuration if available
-        try {
-            $config = Get-OSDCloudConfig -ErrorAction SilentlyContinue
+        # If a custom LogFile is not provided, we use the cached value if available.
+        if ($LogFile) {
+            $currentLogFile = $LogFile
+            # Ensure the log directory exists for the provided LogFile.
+            $logDir = Split-Path -Path $currentLogFile -Parent
+            if (-not (Test-Path -Path $logDir)) {
+                try {
+                    New-Item -Path $logDir -ItemType Directory -Force -ErrorAction Stop | Out-Null
+                }
+                catch {
+                    # Fall back to the temp directory if creation fails.
+                    $currentLogFile = Join-Path -Path $env:TEMP -ChildPath "OSDCloudCustomBuilder.log"
+                }
+            }
         }
-        catch {
-            $config = $null
-        }
-        
-        # Determine log file path
-        if (-not $LogFile) {
-            if ($config -and $config.LogFilePath) {
-                $LogFile = $config.LogFilePath
+        else {
+            if (-not $script:OSDCloudLogger_CacheInitialized) {
+                # Retrieve config (if available) only once
+                try {
+                    $config = Get-OSDCloudConfig -ErrorAction SilentlyContinue
+                }
+                catch {
+                    $config = $null
+                }
+                # Determine the log file based on config or default to temp
+                if ($config -and $config.LogFilePath) {
+                    $script:OSDCloudLogger_LogFile = $config.LogFilePath
+                }
+                else {
+                    $script:OSDCloudLogger_LogFile = Join-Path -Path $env:TEMP -ChildPath "OSDCloudCustomBuilder.log"
+                }
+                # Ensure log directory exists
+                $logDir = Split-Path -Path $script:OSDCloudLogger_LogFile -Parent
+                if (-not (Test-Path -Path $logDir)) {
+                    try {
+                        New-Item -Path $logDir -ItemType Directory -Force -ErrorAction Stop | Out-Null
+                    }
+                    catch {
+                        # Fall back to temp folder in case of error.
+                        $script:OSDCloudLogger_LogFile = Join-Path -Path $env:TEMP -ChildPath "OSDCloudCustomBuilder.log"
+                    }
+                }
+                # Cache the config for future calls.
+                $script:OSDCloudLogger_CacheConfig = $config
+                $script:OSDCloudLogger_CacheInitialized = $true
             }
             else {
-                $LogFile = Join-Path -Path $env:TEMP -ChildPath "OSDCloudCustomBuilder.log"
+                $config = $script:OSDCloudLogger_CacheConfig
             }
+            $currentLogFile = $script:OSDCloudLogger_LogFile
         }
-        
-        # Ensure log directory exists
-        $logDir = Split-Path -Path $LogFile -Parent
-        if (-not (Test-Path -Path $logDir)) {
-            try {
-                New-Item -Path $logDir -ItemType Directory -Force -ErrorAction Stop | Out-Null
-            }
-            catch {
-                # If we can't create the log directory, fall back to temp
-                $LogFile = Join-Path -Path $env:TEMP -ChildPath "OSDCloudCustomBuilder.log"
-            }
-        }
-        
-        # Get verbose and debug preferences from config or use current settings
-        $verboseEnabled = if ($config -and ($null -ne $config.VerboseLogging)) { 
+        # Cache verbose and debug settings from config or fallback to current preferences.
+        $verboseEnabled = if ($config -and ($null -ne $config.VerboseLogging)) {
             $config.VerboseLogging 
-        } else { 
-            $VerbosePreference -ne 'SilentlyContinue' 
         }
-        
-        $debugEnabled = if ($config -and ($null -ne $config.DebugLogging)) { 
+        else {
+            $VerbosePreference -ne 'SilentlyContinue'
+        }
+        $debugEnabled = if ($config -and ($null -ne $config.DebugLogging)) {
             $config.DebugLogging 
-        } else { 
-            $DebugPreference -ne 'SilentlyContinue' 
+        }
+        else {
+            $DebugPreference -ne 'SilentlyContinue'
         }
     }
-    
     process {
-        # Skip verbose or debug messages if not enabled
-        if (($Level -eq 'Verbose' -and -not $verboseEnabled) -or 
-            ($Level -eq 'Debug' -and -not $debugEnabled)) {
+        # Skip verbose or debug messages if they are not enabled.
+        if (
+            ($Level -eq 'Verbose' -and -not $verboseEnabled) -or 
+            ($Level -eq 'Debug' -and -not $debugEnabled)
+        ) {
             return
         }
-        
-        # Format timestamp
+        # Format timestamp just once per log entry.
         $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss.fff"
-        
-        # Format exception details if provided
+        # Format exception details if provided.
         $exceptionDetails = ""
         if ($Exception) {
             $exceptionDetails = "`nException: $($Exception.GetType().FullName): $($Exception.Message)"
@@ -113,39 +128,27 @@ function Invoke-OSDCloudLogger {
                 $exceptionDetails += "`nStackTrace: $($Exception.StackTrace)"
             }
         }
-        
-        # Format the log entry
+        # Format the log entry.
         $logEntry = "[$timestamp] [$Level] [$Component] $Message$exceptionDetails"
-        
-        # Write to log file
+        # Write to log file synchronously.
         try {
-            Add-Content -Path $LogFile -Value $logEntry -Encoding UTF8 -ErrorAction SilentlyContinue
+            Add-Content -Path $currentLogFile -Value $logEntry -Encoding UTF8 -ErrorAction SilentlyContinue
         }
         catch {
-            # If writing to log file fails, at least try to write to console
+            # If writing to log file fails, try writing to console.
             if (-not $NoConsole) {
                 Write-Warning "Failed to write to log file: $_"
             }
         }
-        
-        # Write to console if not disabled
+        # Write log entry to console if not disabled.
         if (-not $NoConsole) {
+            # Instead of doing string replace each time, consider formatting the output as desired.
             switch ($Level) {
-                'Info' { 
-                    Write-Host $logEntry 
-                }
-                'Warning' { 
-                    Write-Warning $logEntry.Replace("[$Level] ", "") 
-                }
-                'Error' { 
-                    Write-Error $logEntry.Replace("[$Level] ", "") 
-                }
-                'Debug' { 
-                    Write-Debug $logEntry.Replace("[$Level] ", "") 
-                }
-                'Verbose' { 
-                    Write-Verbose $logEntry.Replace("[$Level] ", "") 
-                }
+                'Info' { Write-Host $logEntry }
+                'Warning' { Write-Warning $logEntry }
+                'Error' { Write-Error $logEntry }
+                'Debug' { Write-Debug $logEntry }
+                'Verbose' { Write-Verbose $logEntry }
             }
         }
     }

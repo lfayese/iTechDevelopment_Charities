@@ -5,51 +5,58 @@ function Show-Summary {
         [ValidateNotNullOrEmpty()]
         [ValidateScript({Test-Path $_ -PathType Leaf})]
         [string]$WindowsImage,
-        
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
         [string]$ISOPath,
-        
         [Parameter(Mandatory = $false)]
         [switch]$IncludeWinRE
     )
-    
     try {
         # Get Windows image information
         $wimInfo = Get-WindowsImage -ImagePath $WindowsImage -Index 1 -ErrorAction Stop
         $imageName = $wimInfo.ImageName ?? "Custom Windows Image"
         
-        Write-Host "SUMMARY:" -ForegroundColor Yellow
-        Write-Host "=========" -ForegroundColor Yellow
-        Write-Host "Custom Windows Image: $imageName" -ForegroundColor White
-        Write-Host "ISO File: $ISOPath" -ForegroundColor White
+        # Collect summary messages in an array
+        $summaryOutput = @()
+        $summaryOutput += "SUMMARY:"
+        $summaryOutput += "========="
+        $summaryOutput += "Custom Windows Image: $imageName"
+        $summaryOutput += "ISO File: $ISOPath"
         
-        # Check if ISO exists and has write permissions
-        if (Test-Path $ISOPath) {
-            try {
-                $isoSize = [math]::Round((Get-Item $ISOPath -ErrorAction Stop).Length / 1GB, 2)
-                Write-Host "ISO Size: $isoSize GB" -ForegroundColor White
-            }
-            catch {
-                Write-Warning "Unable to access ISO file: $($_.Exception.Message)"
-            }
-        } else {
-            Write-Warning "ISO File not found at path: $ISOPath"
+        try {
+            # Attempt to retrieve the ISO file information in one call
+            $isoFile = Get-Item -Path $ISOPath -ErrorAction Stop
+            $isoSize = [math]::Round($isoFile.Length / 1GB, 2)
+            $summaryOutput += "ISO Size: $isoSize GB"
         }
-        
-        Write-Host "The ISO includes:" -ForegroundColor Yellow
-        Write-Host "- Custom Windows Image (custom.wim)" -ForegroundColor White
-        Write-Host "- PowerShell 7 support" -ForegroundColor White
-        Write-Host "- OSDCloud customizations" -ForegroundColor White
+        catch {
+            $summaryOutput += "Warning: Unable to access ISO file - $($_.Exception.Message)"
+        }
+        $summaryOutput += "The ISO includes:"
+        $summaryOutput += "- Custom Windows Image (custom.wim)"
+        $summaryOutput += "- PowerShell 7 support"
+        $summaryOutput += "- OSDCloud customizations"
         if ($IncludeWinRE) {
-            Write-Host "- WinRE for WiFi support" -ForegroundColor White
+            $summaryOutput += "- WinRE for WiFi support"
         }
+        $summaryOutput += "To use this ISO:"
+        $summaryOutput += "1. Burn the ISO to a USB drive using Rufus or similar tool"
+        $summaryOutput += "2. Boot the target computer from the USB drive"
+        $summaryOutput += "3. The UI will automatically start with PowerShell 7"
+        $summaryOutput += "4. Select 'Start-OSDCloud' to deploy the custom Windows image"
         
-        Write-Host "To use this ISO:" -ForegroundColor Yellow
-        Write-Host "1. Burn the ISO to a USB drive using Rufus or similar tool" -ForegroundColor White
-        Write-Host "2. Boot the target computer from the USB drive" -ForegroundColor White
-        Write-Host "3. The UI will automatically start with PowerShell 7" -ForegroundColor White
-        Write-Host "4. Select 'Start-OSDCloud' to deploy the custom Windows image" -ForegroundColor White
+        # Output all messages with appropriate color emphasis where needed
+        foreach ($line in $summaryOutput) {
+            if ($line -match "^(SUMMARY:|=========|The ISO includes:|To use this ISO:)") {
+                Write-Host $line -ForegroundColor Yellow
+            }
+            elseif ($line -match "Warning:") {
+                Write-Warning $line
+            }
+            else {
+                Write-Host $line -ForegroundColor White
+            }
+        }
     }
     catch {
         Write-Error "An error occurred while processing the Windows image: $($_.Exception.Message)"

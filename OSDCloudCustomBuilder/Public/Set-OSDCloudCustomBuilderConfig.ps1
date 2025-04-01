@@ -24,39 +24,53 @@ function Set-OSDCloudCustomBuilderConfig {
     )
     # Retrieve the existing configuration object
     $config = Get-ModuleConfiguration
-    # Update configuration with provided parameters using PSBoundParameters checks
-    if ($PSBoundParameters.ContainsKey('DefaultPowerShellVersion')) {
-        $config.PowerShellVersions.Default = $DefaultPowerShellVersion
-    }
-    if ($PSBoundParameters.ContainsKey('SupportedPowerShellVersions')) {
-        $config.PowerShellVersions.Supported = $SupportedPowerShellVersions
-    }
-    if ($PSBoundParameters.ContainsKey('PowerShellVersionHashes')) {
-        # Merge the provided hashtable into the configuration.
-        foreach ($item in $PowerShellVersionHashes.GetEnumerator()) {
-            $config.PowerShellVersions.Hashes[$item.Key] = $item.Value
+    # Loop through all bound parameters to update config accordingly
+    foreach ($paramName in $PSBoundParameters.Keys) {
+        switch ($paramName) {
+            'DefaultPowerShellVersion' {
+                $config.PowerShellVersions.Default = $DefaultPowerShellVersion
+                break
+            }
+            'SupportedPowerShellVersions' {
+                $config.PowerShellVersions.Supported = $SupportedPowerShellVersions
+                break
+            }
+            'PowerShellVersionHashes' {
+                # Merge the provided hashtable into the configuration.
+                foreach ($item in $PowerShellVersionHashes.GetEnumerator()) {
+                    $config.PowerShellVersions.Hashes[$item.Key] = $item.Value
+                }
+                break
+            }
+            'PowerShellDownloadUrl' {
+                $config.DownloadSources.PowerShell = $PowerShellDownloadUrl
+                break
+            }
+            'MountTimeout' {
+                $config.Timeouts.Mount = $MountTimeout
+                break
+            }
+            'DismountTimeout' {
+                $config.Timeouts.Dismount = $DismountTimeout
+                break
+            }
+            'DownloadTimeout' {
+                $config.Timeouts.Download = $DownloadTimeout
+                break
+            }
+            'JobTimeout' {
+                $config.Timeouts.Job = $JobTimeout
+                break
+            }
+            'CachePath' {
+                $config.Paths.Cache = $CachePath
+                break
+            }
+            'TempPath' {
+                $config.Paths.Temp = $TempPath
+                break
+            }
         }
-    }
-    if ($PSBoundParameters.ContainsKey('PowerShellDownloadUrl')) {
-        $config.DownloadSources.PowerShell = $PowerShellDownloadUrl
-    }
-    if ($PSBoundParameters.ContainsKey('MountTimeout')) {
-        $config.Timeouts.Mount = $MountTimeout
-    }
-    if ($PSBoundParameters.ContainsKey('DismountTimeout')) {
-        $config.Timeouts.Dismount = $DismountTimeout
-    }
-    if ($PSBoundParameters.ContainsKey('DownloadTimeout')) {
-        $config.Timeouts.Download = $DownloadTimeout
-    }
-    if ($PSBoundParameters.ContainsKey('JobTimeout')) {
-        $config.Timeouts.Job = $JobTimeout
-    }
-    if ($PSBoundParameters.ContainsKey('CachePath')) {
-        $config.Paths.Cache = $CachePath
-    }
-    if ($PSBoundParameters.ContainsKey('TempPath')) {
-        $config.Paths.Temp = $TempPath
     }
     # Define the configuration file path only once
     $configPath = Join-Path -Path $env:USERPROFILE -ChildPath ".osdcloudcustombuilder\config.json"

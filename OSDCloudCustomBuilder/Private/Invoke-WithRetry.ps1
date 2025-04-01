@@ -57,9 +57,7 @@ function Invoke-WithRetry {
     )
     begin {
         # Cache the logger command availability
-        # Use the module-level cached logger existence check
         $loggerExists = $script:LoggerExists
-        
         if ($loggerExists) {
             Invoke-OSDCloudLogger -Message "Starting $OperationName with retry logic (max retries: $MaxRetries)" -Level Info -Component "Invoke-WithRetry"
         }
@@ -67,13 +65,15 @@ function Invoke-WithRetry {
             Write-Verbose "Starting $OperationName with retry logic (max retries: $MaxRetries)"
         }
         
-        # Initialize retry counter
-        $retryCount = 0
-        # Function to check if an error is retryable
+        # Pre-compile regexes from error patterns for faster matching
+        $compiledRegexPatterns = foreach ($pattern in $RetryableErrorPatterns) {
+            [regex]::new($pattern, 'IgnoreCase')
+        }
+        # Helper function to determine if an error is retryable
         function Test-RetryableError {
             param ([System.Management.Automation.ErrorRecord]$ErrorRecord)
-            foreach ($pattern in $RetryableErrorPatterns) {
-                if ($ErrorRecord.Exception.Message -match $pattern) {
+            foreach ($regex in $compiledRegexPatterns) {
+                if ($regex.IsMatch($ErrorRecord.Exception.Message)) {
                     return $true
                 }
             }
@@ -81,44 +81,41 @@ function Invoke-WithRetry {
         }
     }
     process {
-        do {
+        # Use an iterative delay calculation to avoid repeated Pow calls.
+        $currentDelay = $RetryDelayBase
+        for ($retryCount = 0; $retryCount -le $MaxRetries; $retryCount++) {
             try {
                 # Execute the script block
                 $result = & $ScriptBlock
-                # Log success
                 if ($loggerExists) {
                     Invoke-OSDCloudLogger -Message "$OperationName completed successfully" -Level Info -Component "Invoke-WithRetry"
                 }
                 else {
                     Write-Verbose "$OperationName completed successfully"
                 }
-                # Return the result
                 return $result
             }
             catch {
-                # Check if the error is retryable
                 $isRetryable = Test-RetryableError -ErrorRecord $_
+                
                 if ($isRetryable -and $retryCount -lt $MaxRetries) {
-                    # Increment retry counter
-                    $retryCount++
-                    # Calculate delay with exponential backoff and jitter
-                    $delay = [Math]::Pow($RetryDelayBase, $retryCount)
+                    # Calculate jitter between -50% and +50%
                     $jitter = Get-Random -Minimum -0.5 -Maximum 0.5
-                    $delayWithJitter = $delay + ($delay * $jitter)
+                    $delayWithJitter = $currentDelay + ($currentDelay * $jitter)
                     $delayMs = [int]($delayWithJitter * 1000)
-                    # Log retry attempt
-                    $errorMessage = "$OperationName failed with retryable error: $($_.Exception.Message). Retrying in $([Math]::Round($delayWithJitter, 2)) seconds (attempt $retryCount of $MaxRetries)."
+                    
+                    $errorMessage = "$OperationName failed with retryable error: $($_.Exception.Message). Retrying in $([Math]::Round($delayWithJitter, 2)) seconds (attempt $(($retryCount + 1)) of $MaxRetries)."
                     if ($loggerExists) {
                         Invoke-OSDCloudLogger -Message $errorMessage -Level Warning -Component "Invoke-WithRetry" -Exception $_.Exception
                     }
                     else {
                         Write-Warning $errorMessage
                     }
-                    # Wait before retrying
                     Start-Sleep -Milliseconds $delayMs
+                    # Multiply for exponential backoff
+                    $currentDelay *= $RetryDelayBase
                 }
                 else {
-                    # Log non-retryable error or max retries exceeded
                     if ($isRetryable) {
                         $errorMessage = "Max retries ($MaxRetries) exceeded for $OperationName. Last error: $($_.Exception.Message)"
                     }
@@ -134,6 +131,6 @@ function Invoke-WithRetry {
                     throw
                 }
             }
-        } while ($retryCount -le $MaxRetries)
+        }
     }
 }

@@ -18,43 +18,39 @@
     Version: 1.0.0
     Author: OSDCloud Team
 #>
+# Define a static block-level variable for supported minor versions to avoid recreating it on every function call.
+if (-not $script:SupportedMinorVersions) {
+    $script:SupportedMinorVersions = @(0, 1, 2, 3, 4, 5)
+}
 function Test-ValidPowerShellVersion {
     [CmdletBinding()]
     param (
         [Parameter(Mandatory=$true,
-                  Position=0,
-                  HelpMessage="PowerShell version to validate (format: X.Y.Z)")]
+                   Position=0,
+                   HelpMessage="PowerShell version to validate (format: X.Y.Z)")]
         [string]$Version
     )
-    
     try {
-        # Check if the version is in the correct format (X.Y.Z)
-        if (-not ($Version -match '^\d+\.\d+\.\d+$')) {
+        # Check that the version string matches the X.Y.Z format using a regex pattern.
+        $regexPattern = '^\d+\.\d+\.\d+$'
+        if (-not ($Version -match $regexPattern)) {
             Write-OSDCloudLog -Message "Invalid PowerShell version format: $Version. Must be in X.Y.Z format." -Level Warning -Component "Test-ValidPowerShellVersion"
             return $false
         }
-        
-        # Parse version components
-        $versionParts = $Version -split '\.' | ForEach-Object { [int]$_ }
+        # Split the version string and convert the parts to integers without a pipeline.
+        $versionParts = [int[]]($Version -split '\.')
         $major = $versionParts[0]
         $minor = $versionParts[1]
-        $patch = $versionParts[2]
-        
-        # Check if it's PowerShell 7.x
+        # Check if it's PowerShell 7.x.
         if ($major -ne 7) {
             Write-OSDCloudLog -Message "Unsupported PowerShell major version: $major. Only PowerShell 7.x is supported." -Level Warning -Component "Test-ValidPowerShellVersion"
             return $false
         }
-        
-        # Check supported minor versions (adjust as needed)
-        $supportedMinorVersions = @(0, 1, 2, 3, 4, 5)
-        if ($minor -notin $supportedMinorVersions) {
+        # Use the pre-defined supported minor versions array.
+        if (-not $script:SupportedMinorVersions.Contains($minor)) {
             Write-OSDCloudLog -Message "Unsupported PowerShell minor version: $Version. Supported versions: 7.0.x, 7.1.x, 7.2.x, 7.3.x, 7.4.x, 7.5.x" -Level Warning -Component "Test-ValidPowerShellVersion"
             return $false
         }
-        
-        # Additional validation could be added here for specific version compatibility
-        
         Write-OSDCloudLog -Message "PowerShell version $Version is valid and supported" -Level Info -Component "Test-ValidPowerShellVersion"
         return $true
     }
@@ -63,6 +59,5 @@ function Test-ValidPowerShellVersion {
         return $false
     }
 }
-
-# Export the function
+# Export the function.
 Export-ModuleMember -Function Test-ValidPowerShellVersion

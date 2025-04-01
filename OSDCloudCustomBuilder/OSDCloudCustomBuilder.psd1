@@ -1,6 +1,6 @@
 @{
     RootModule        = 'OSDCloudCustomBuilder.psm1'
-    ModuleVersion     = '0.2.0'
+    ModuleVersion     = '0.3.0'
     GUID              = 'e1e0a9c5-7b38-4b1a-9f9c-32743e2a6613'
     Author            = 'OSDCloud Team'
     CompanyName       = 'OSDCloud'
@@ -14,7 +14,9 @@
         'Import-OSDCloudConfig',
         'Export-OSDCloudConfig',
         'Update-OSDCloudConfig',
-        'Set-OSDCloudCustomBuilderConfig'
+        'Set-OSDCloudCustomBuilderConfig',
+        'Set-OSDCloudTelemetry',
+        'ConvertTo-OSDCloudDocumentation'
     )
     CmdletsToExport   = @()
     VariablesToExport = '*'
@@ -28,6 +30,16 @@
             LicenseUri   = 'https://github.com/ofayese/OSDCloudCustomBuilder/blob/main/LICENSE'
             ProjectUri   = 'https://github.com/ofayese/OSDCloudCustomBuilder'
             ReleaseNotes = @'
+# Version 0.3.0
+- Added optional telemetry system to help identify issues in production environments
+- Added documentation generation from code comments with ConvertTo-OSDCloudDocumentation
+- Added example scripts that demonstrate new capabilities
+- Added Set-OSDCloudTelemetry for configuring telemetry options
+- Enhanced Measure-OSDCloudOperation with detailed process and system metrics
+- Added telemetry privacy controls and storage path configuration
+- Improved documentation with comprehensive examples and parameter descriptions
+- Added support for converting code comments to Markdown documentation
+
 # Version 0.2.0
 - Added comprehensive error handling with try/catch blocks
 - Implemented centralized logging system with Write-OSDCloudLog and Invoke-OSDCloudLogger

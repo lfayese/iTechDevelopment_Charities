@@ -1,45 +1,38 @@
-# You'll need to modify Copy-CustomWimToWorkspace to support robocopy
 function Copy-CustomWimToWorkspace {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
         [string]$WimPath,
-        
         [Parameter(Mandatory = $true)]
         [string]$WorkspacePath,
-        
         [Parameter(Mandatory = $false)]
         [switch]$UseRobocopy
     )
     
-    $destination = Join-Path -Path $WorkspacePath -ChildPath (Split-Path -Path $WimPath -Leaf)
-    
+    # Cache the split path results to avoid redundant calls
+    $wimFile = Split-Path -Path $WimPath -Leaf
+    $wimDir  = Split-Path -Path $WimPath -Parent
     if ($UseRobocopy -and (Get-Command "robocopy.exe" -ErrorAction SilentlyContinue)) {
-        $sourceDir = Split-Path -Path $WimPath -Parent
-        $sourceFile = Split-Path -Path $WimPath -Leaf
-        $destDir = $WorkspacePath
-        
         # Use robocopy for faster copying of large files
-        # /J = copy using unbuffered I/O (faster for large files)
-        # /MT = multithreaded copying
+        # /J: copy using unbuffered I/O (faster for large files)
+        # /MT: multithreaded copying
         $robocopyParams = @(
-            "`"$sourceDir`"",
-            "`"$destDir`"",
-            "`"$sourceFile`"",
+            "`"$wimDir`"",
+            "`"$WorkspacePath`"",
+            "`"$wimFile`"",
             "/J",
             "/MT:8"
         )
-        
         $robocopyResult = Start-Process -FilePath "robocopy.exe" -ArgumentList $robocopyParams -NoNewWindow -Wait -PassThru
         
-        # Robocopy has special exit codes
-        # 0-7 are success codes, 8+ are failure codes
+        # Robocopy returns exit codes 0-7 for success; 8+ indicates a failure.
         if ($robocopyResult.ExitCode -gt 7) {
             throw "Robocopy failed with exit code $($robocopyResult.ExitCode)"
         }
     }
     else {
-        # Fall back to Copy-Item if robocopy is not available
+        # Compute destination only when needed
+        $destination = Join-Path -Path $WorkspacePath -ChildPath $wimFile
         Copy-Item -Path $WimPath -Destination $destination -Force
     }
 }
