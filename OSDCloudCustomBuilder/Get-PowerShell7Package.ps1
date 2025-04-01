@@ -1,35 +1,37 @@
+<#
+.SYNOPSIS
+    Downloads or validates a PowerShell 7 package.
+.DESCRIPTION
+    This function either downloads a PowerShell 7 package from the official Microsoft repository
+    or validates an existing package file. It supports version validation, download progress
+    tracking, and integrity verification of the downloaded package.
+.PARAMETER Version
+    The PowerShell version to download in X.Y.Z format (e.g., "7.3.4").
+    Must be a valid and supported PowerShell 7 version.
+.PARAMETER DownloadPath
+    The path where the PowerShell 7 package will be downloaded.
+    If the file already exists at this path, it will be validated instead of downloaded again.
+.PARAMETER Force
+    If specified, will re-download the package even if it already exists at the destination path.
+.EXAMPLE
+    Get-PowerShell7Package -Version "7.3.4" -DownloadPath "C:\Temp\PowerShell-7.3.4-win-x64.zip"
+    # Downloads PowerShell 7.3.4 to the specified path
+.EXAMPLE
+    Get-PowerShell7Package -Version "7.3.4" -DownloadPath "C:\Temp\PowerShell-7.3.4-win-x64.zip" -Force
+    # Forces a re-download even if the file already exists
+.NOTES
+    Version: 1.0.0
+    Author: OSDCloud Team
+    Requirements:
+    - Internet connectivity for downloading
+    - Write access to the download directory
+#>
 function Get-PowerShell7Package {
-    <#
-    .SYNOPSIS
-        Downloads or validates a PowerShell 7 package.
-    .DESCRIPTION
-        This function either downloads a PowerShell 7 package from the official Microsoft repository
-        or validates an existing package file. It supports version validation, download progress
-        tracking, and integrity verification of the downloaded package.
-    .PARAMETER Version
-        The PowerShell version to download in X.Y.Z format (e.g., "7.3.4").
-        Must be a valid and supported PowerShell 7 version.
-    .PARAMETER DownloadPath
-        The path where the PowerShell 7 package will be downloaded.
-        If the file already exists at this path, it will be validated instead of downloaded again.
-    .PARAMETER Force
-        If specified, will re-download the package even if it already exists at the destination path.
-    .EXAMPLE
-        Get-PowerShell7Package -Version "7.3.4" -DownloadPath "C:\Temp\PowerShell-7.3.4-win-x64.zip"
-        # Downloads PowerShell 7.3.4 to the specified path
-    .EXAMPLE
-        Get-PowerShell7Package -Version "7.3.4" -DownloadPath "C:\Temp\PowerShell-7.3.4-win-x64.zip" -Force
-        # Forces a re-download even if the file already exists
-    .NOTES
-        Version: 1.0.0
-        Author: OSDCloud Team
-        Requirements:
-        - Internet connectivity for downloading
-        - Write access to the download directory
-    #>
     [CmdletBinding(SupportsShouldProcess=$true)]
     param (
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory=$true,
+                   Position=0,
+                   HelpMessage="PowerShell version to download")]
         [ValidateNotNullOrEmpty()]
         [ValidateScript({
             if (Test-ValidPowerShellVersion -Version $_) { 
@@ -39,11 +41,14 @@ function Get-PowerShell7Package {
         })]
         [string]$Version,
         
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory=$true,
+                   Position=1,
+                   HelpMessage="Path where the package will be downloaded")]
         [ValidateNotNullOrEmpty()]
         [string]$DownloadPath,
         
-        [Parameter()]
+        [Parameter(Position=2,
+                   HelpMessage="Force download even if package already exists")]
         [switch]$Force
     )
     
@@ -57,7 +62,10 @@ function Get-PowerShell7Package {
         # Ensure download directory exists
         $downloadDir = Split-Path -Path $DownloadPath -Parent
         if (-not (Test-Path -Path $downloadDir -PathType Container)) {
-            New-Item -Path $downloadDir -ItemType Directory -Force | Out-Null
+            if ($PSCmdlet.ShouldProcess($downloadDir, "Create download directory")) {
+                New-Item -Path $downloadDir -ItemType Directory -Force | Out-Null
+                Write-OSDCloudLog -Message "Created download directory: $downloadDir" -Level Info -Component "Get-PowerShell7Package"
+            }
         }
         
         # Construct download URL
@@ -65,7 +73,7 @@ function Get-PowerShell7Package {
         
         Write-OSDCloudLog -Message "Downloading PowerShell 7 v$Version from $downloadUrl" -Level Info -Component "Get-PowerShell7Package"
         
-        if ($PSCmdlet.ShouldProcess($downloadUrl, "Download PowerShell 7 package")) {
+        if ($PSCmdlet.ShouldProcess($downloadUrl, "Download PowerShell 7 package to $DownloadPath")) {
             # Download with progress
             $webClient = New-Object System.Net.WebClient
             $webClient.Headers.Add("User-Agent", "OSDCloudCustomBuilder/1.0")
@@ -80,6 +88,10 @@ function Get-PowerShell7Package {
             
             try {
                 $webClient.DownloadFile($downloadUrl, $DownloadPath)
+            }
+            catch {
+                Write-OSDCloudLog -Message "Download failed: $_" -Level Error -Component "Get-PowerShell7Package" -Exception $_.Exception
+                throw "Failed to download PowerShell 7 package from $downloadUrl : $_"
             }
             finally {
                 # Clean up event handlers
@@ -102,6 +114,9 @@ function Get-PowerShell7Package {
     catch {
         $errorMessage = "Failed to download PowerShell 7 package: $_"
         Write-OSDCloudLog -Message $errorMessage -Level Error -Component "Get-PowerShell7Package" -Exception $_.Exception
-        throw
+        throw $errorMessage
     }
 }
+
+# Export the function
+Export-ModuleMember -Function Get-PowerShell7Package
