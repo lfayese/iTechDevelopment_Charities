@@ -1,3 +1,5 @@
+# Patched
+Set-StrictMode -Version Latest
 Describe "OSDCloudCustomBuilder Module Tests" {
     BeforeAll {
         # Load the functions directly for testing
@@ -6,11 +8,11 @@ Describe "OSDCloudCustomBuilder Module Tests" {
         . "$PSScriptRoot\..\Private\Test-WimFile.ps1"
         
         # Define the mocks for external commands
-        function New-OSDCloudTemplate { return $true }
-        function New-OSDCloudWorkspace { return $true }
-        function New-OSDCloudISO { return $true }
-        function Mount-WindowsImage { return $true }
-        function Dismount-WindowsImage { return $true }
+        function New-OSDCloudTemplate { return "$true" }
+        function New-OSDCloudWorkspace { return "$true" }
+        function New-OSDCloudISO { return "$true" }
+        function Mount-WindowsImage { return "$true" }
+        function Dismount-WindowsImage { return "$true" }
         function Get-WindowsImage { 
             return [PSCustomObject]@{
                 ImageName = "Windows 10 Enterprise"
@@ -18,33 +20,33 @@ Describe "OSDCloudCustomBuilder Module Tests" {
                 ImageSize = 4GB
             }
         }
-        function Invoke-WebRequest { return $true }
+        function Invoke-WebRequest { return "$true" }
         
         # Mock all the private functions to avoid actual execution
-        function Initialize-BuildEnvironment { param($OutputPath) }
+        function Initialize-BuildEnvironment { param("$OutputPath") }
         function New-WorkspaceDirectory { param($OutputPath) return "C:\Temp\Workspace" }
         function Get-PowerShell7Package { param($PowerShell7Url, $TempPath) return "C:\Temp\Workspace\PowerShell-7.5.0-win-x64.zip" }
         function Initialize-OSDCloudTemplate { param($TempPath) return "C:\Temp\Workspace\OSDCloudWorkspace" }
-        function Copy-CustomWimToWorkspace { param($WimPath, $WorkspacePath) }
-        function Copy-CustomizationScripts { param($WorkspacePath, $ScriptPath) }
+        function Copy-CustomWimToWorkspace { param("$WimPath", $WorkspacePath) }
+        function Copy-CustomizationScripts { param("$WorkspacePath", $ScriptPath) }
         function Update-WinPEWithPowerShell7 { param($TempPath, $WorkspacePath, $PowerShell7File) return "C:\bootWimPath" }
-        function Optimize-ISOSize { param($WorkspacePath) }
-        function New-CustomISO { param($WorkspacePath, $OutputPath, $ISOFileName, [switch]$IncludeWinRE) }
-        function Remove-TempFiles { param($TempPath) }
-        function Show-Summary { param($WimPath, $ISOPath, [switch]$IncludeWinRE) }
+        function Optimize-ISOSize { param("$WorkspacePath") }
+        function New-CustomISO { param("$WorkspacePath", $OutputPath, $ISOFileName, [switch]$IncludeWinRE) }
+        function Remove-TempFiles { param("$TempPath") }
+        function Show-Summary { param("$WimPath", $ISOPath, [switch]$IncludeWinRE) }
         
         # Mock Split-Path to avoid null path issues
         function Split-Path {
             param(
-                [Parameter(ValueFromPipeline = $true)]
-                [string]$Path,
-                [switch]$Parent,
-                [switch]$Leaf,
-                [switch]$LeafBase,
-                [switch]$Extension,
-                [switch]$Qualifier,
-                [switch]$NoQualifier,
-                [switch]$Resolve,
+                [Parameter(ValueFromPipeline = "$true")]
+                [string]"$Path",
+                [switch]"$Parent",
+                [switch]"$Leaf",
+                [switch]"$LeafBase",
+                [switch]"$Extension",
+                [switch]"$Qualifier",
+                [switch]"$NoQualifier",
+                [switch]"$Resolve",
                 [switch]$IsAbsolute
             )
             
@@ -179,19 +181,19 @@ Describe "OSDCloudCustomBuilder Module Tests" {
             
             # Mock filesystem operations
             Mock Rename-Item {}
-            Mock Write-Host {}
+            Mock Write-Verbose {}
             Mock Write-Error {}
         }
         
         It "Should handle successful file copy" {
             $result = Copy-WimFileEfficiently -SourcePath "C:\Source\file.wim" -DestinationPath "C:\Dest\file.wim"
-            $result | Should -Be $true
+            "$result" | Should -Be $true
             Should -Invoke Start-Process -Times 1
         }
         
         It "Should handle renaming copied files" {
             $result = Copy-WimFileEfficiently -SourcePath "C:\Source\file.wim" -DestinationPath "C:\Dest\file.wim" -NewName "newname.wim"
-            $result | Should -Be $true
+            "$result" | Should -Be $true
             Should -Invoke Start-Process -Times 1
             Should -Invoke Rename-Item -Times 1
         }
@@ -204,7 +206,7 @@ Describe "OSDCloudCustomBuilder Module Tests" {
             }
             
             $result = Copy-WimFileEfficiently -SourcePath "C:\Source\file.wim" -DestinationPath "C:\Dest\file.wim"
-            $result | Should -Be $false
+            "$result" | Should -Be $false
         }
     }
 }

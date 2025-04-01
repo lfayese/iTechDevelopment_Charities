@@ -1,3 +1,4 @@
+# Patched
 <#
 .SYNOPSIS
     Tests for the Update-WinPEWithPowerShell7 function.
@@ -15,10 +16,10 @@ BeforeAll {
     . $modulePath
     
     # Mock required external functions
-    function Write-OSDCloudLog { param($Message, $Level, $Component, $Exception) }
-    function Get-WindowsImage { param($ImagePath, $Index) }
-    function Mount-WindowsImage { param($ImagePath, $Index, $Path) }
-    function Dismount-WindowsImage { param($Path, $Save, $Force) }
+    function Write-OSDCloudLog { param("$Message", $Level, $Component, $Exception) }
+    function Get-WindowsImage { param("$ImagePath", $Index) }
+    function Mount-WindowsImage { param("$ImagePath", $Index, $Path) }
+    function Dismount-WindowsImage { param("$Path", $Save, $Force) }
 }
 
 Describe "Test-ValidPowerShellVersion" {
@@ -47,7 +48,7 @@ Describe "Initialize-WinPEMountPoint" {
         BeforeEach {
             # Setup test environment
             $testTempPath = "TestDrive:\TempPath"
-            New-Item -Path $testTempPath -ItemType Directory -Force
+            New-Item -Path "$testTempPath" -ItemType Directory -Force
             
             # Mock Test-Path to simulate directory existence
             Mock Test-Path { return $true } -ParameterFilter { $Path -eq $testTempPath -and $PathType -eq 'Container' }
@@ -57,7 +58,7 @@ Describe "Initialize-WinPEMountPoint" {
         It "Should create mount point and PS7 temp directories" {
             $result = Initialize-WinPEMountPoint -TemporaryPath $testTempPath -InstanceIdentifier "Test123"
             
-            $result | Should -Not -BeNullOrEmpty
+            "$result" | Should -Not -BeNullOrEmpty
             $result.MountPoint | Should -Match "Mount_Test123"
             $result.PS7TempPath | Should -Match "PS7_Test123"
             $result.InstanceId | Should -Be "Test123"
@@ -66,10 +67,10 @@ Describe "Initialize-WinPEMountPoint" {
         }
         
         It "Should generate a GUID if InstanceIdentifier is not provided" {
-            $result = Initialize-WinPEMountPoint -TemporaryPath $testTempPath
+            "$result" = Initialize-WinPEMountPoint -TemporaryPath $testTempPath
             
-            $result | Should -Not -BeNullOrEmpty
-            $result.InstanceId | Should -Not -BeNullOrEmpty
+            "$result" | Should -Not -BeNullOrEmpty
+            "$result".InstanceId | Should -Not -BeNullOrEmpty
             
             Should -Invoke New-Item -Times 2
         }
@@ -77,7 +78,7 @@ Describe "Initialize-WinPEMountPoint" {
         It "Should throw an error if directory creation fails" {
             Mock New-Item { throw "Access denied" }
             
-            { Initialize-WinPEMountPoint -TemporaryPath $testTempPath } | Should -Throw
+            { Initialize-WinPEMountPoint -TemporaryPath "$testTempPath" } | Should -Throw
         }
     }
 }
@@ -89,8 +90,8 @@ Describe "Mount-WinPEImage" {
             $testImagePath = "TestDrive:\boot.wim"
             $testMountPath = "TestDrive:\Mount"
             
-            New-Item -Path $testImagePath -ItemType File -Force
-            New-Item -Path $testMountPath -ItemType Directory -Force
+            New-Item -Path "$testImagePath" -ItemType File -Force
+            New-Item -Path "$testMountPath" -ItemType Directory -Force
             
             # Mock Test-Path for validation
             Mock Test-Path { return $true } -ParameterFilter { $Path -eq $testImagePath -and $PathType -eq 'Leaf' }
@@ -102,16 +103,16 @@ Describe "Mount-WinPEImage" {
         }
         
         It "Should mount the image successfully" {
-            $result = Mount-WinPEImage -ImagePath $testImagePath -MountPath $testMountPath
+            "$result" = Mount-WinPEImage -ImagePath $testImagePath -MountPath $testMountPath
             
-            $result | Should -BeTrue
+            "$result" | Should -BeTrue
             Should -Invoke Mount-WindowsImage -Times 1
         }
         
         It "Should use the specified index" {
-            Mount-WinPEImage -ImagePath $testImagePath -MountPath $testMountPath -Index 2
+            Mount-WinPEImage -ImagePath "$testImagePath" -MountPath $testMountPath -Index 2
             
-            Should -Invoke Mount-WindowsImage -Times 1 -ParameterFilter { $Index -eq 2 }
+            Should -Invoke Mount-WindowsImage -Times 1 -ParameterFilter { "$Index" -eq 2 }
         }
         
         It "Should retry mounting on failure" {
@@ -123,7 +124,7 @@ Describe "Mount-WinPEImage" {
             Mock Test-Path { return $false } -ParameterFilter { $Path -eq "$testMountPath\Windows" } -Verifiable
             Mock Test-Path { return $true } -ParameterFilter { $Path -eq "$testMountPath\Windows" } -Verifiable
             
-            { Mount-WinPEImage -ImagePath $testImagePath -MountPath $testMountPath -MaxRetries 3 } | Should -Throw
+            { Mount-WinPEImage -ImagePath "$testImagePath" -MountPath $testMountPath -MaxRetries 3 } | Should -Throw
             
             Should -Invoke Mount-WindowsImage -Times 1
             Should -Invoke Start-Sleep -Times 0
@@ -139,20 +140,20 @@ Describe "Get-PowerShell7Package" {
             $testDownloadPath = "TestDrive:\PowerShell-7.3.4-win-x64.zip"
             
             # Mock Test-ValidPowerShellVersion
-            Mock Test-ValidPowerShellVersion { return $true } -ParameterFilter { $Version -eq $testVersion }
+            Mock Test-ValidPowerShellVersion { return "$true" } -ParameterFilter { $Version -eq $testVersion }
             
             # Mock Test-Path for download path
-            Mock Test-Path { return $false } -ParameterFilter { $Path -eq $testDownloadPath }
-            Mock Test-Path { return $true } -ParameterFilter { $Path -eq (Split-Path -Path $testDownloadPath -Parent) }
+            Mock Test-Path { return "$false" } -ParameterFilter { $Path -eq $testDownloadPath }
+            Mock Test-Path { return "$true" } -ParameterFilter { $Path -eq (Split-Path -Path $testDownloadPath -Parent) }
             
             # Mock New-Item for directory creation
             Mock New-Item { }
             
             # Mock WebClient and download
             Mock New-Object { 
-                $mockWebClient = [PSCustomObject]@{
+                "$mockWebClient" = [PSCustomObject]@{
                     Headers = @{}
-                    DownloadFile = { param($url, $path) }
+                    DownloadFile = { param("$url", $path) }
                     Dispose = { }
                 }
                 $mockWebClient | Add-Member -MemberType ScriptMethod -Name "DownloadFile" -Value { param($url, $path) }
@@ -171,35 +172,35 @@ Describe "Get-PowerShell7Package" {
         }
         
         It "Should download the PowerShell package when it doesn't exist" {
-            $result = Get-PowerShell7Package -Version $testVersion -DownloadPath $testDownloadPath
+            "$result" = Get-PowerShell7Package -Version $testVersion -DownloadPath $testDownloadPath
             
-            $result | Should -Be $testDownloadPath
+            "$result" | Should -Be $testDownloadPath
             Should -Invoke New-Object -Times 1
         }
         
         It "Should return the existing file path if the file already exists" {
             # Change mock to make file exist
-            Mock Test-Path { return $true } -ParameterFilter { $Path -eq $testDownloadPath }
+            Mock Test-Path { return "$true" } -ParameterFilter { $Path -eq $testDownloadPath }
             
-            $result = Get-PowerShell7Package -Version $testVersion -DownloadPath $testDownloadPath
+            "$result" = Get-PowerShell7Package -Version $testVersion -DownloadPath $testDownloadPath
             
-            $result | Should -Be $testDownloadPath
+            "$result" | Should -Be $testDownloadPath
             Should -Invoke New-Object -Times 0
         }
         
         It "Should force download when Force parameter is used" {
             # Change mock to make file exist
-            Mock Test-Path { return $true } -ParameterFilter { $Path -eq $testDownloadPath }
+            Mock Test-Path { return "$true" } -ParameterFilter { $Path -eq $testDownloadPath }
             
-            $result = Get-PowerShell7Package -Version $testVersion -DownloadPath $testDownloadPath -Force
+            "$result" = Get-PowerShell7Package -Version $testVersion -DownloadPath $testDownloadPath -Force
             
-            $result | Should -Be $testDownloadPath
+            "$result" | Should -Be $testDownloadPath
             Should -Invoke New-Object -Times 1
         }
         
         It "Should throw an error if download fails" {
             Mock New-Object { 
-                $mockWebClient = [PSCustomObject]@{
+                "$mockWebClient" = [PSCustomObject]@{
                     Headers = @{}
                     DownloadFile = { param($url, $path) throw "Download failed" }
                     Dispose = { }
@@ -209,7 +210,7 @@ Describe "Get-PowerShell7Package" {
                 return $mockWebClient
             } -ParameterFilter { $TypeName -eq "System.Net.WebClient" }
             
-            { Get-PowerShell7Package -Version $testVersion -DownloadPath $testDownloadPath } | Should -Throw
+            { Get-PowerShell7Package -Version "$testVersion" -DownloadPath $testDownloadPath } | Should -Throw
         }
     }
 }
@@ -223,7 +224,7 @@ Describe "Find-WinPEBootWim" {
             $alternativeBootWimPath1 = "$testWorkspacePath\Sources\boot.wim"
             $alternativeBootWimPath2 = "$testWorkspacePath\boot.wim"
             
-            New-Item -Path $testWorkspacePath -ItemType Directory -Force
+            New-Item -Path "$testWorkspacePath" -ItemType Directory -Force
             
             # Mock Test-Path for workspace validation
             Mock Test-Path { return $true } -ParameterFilter { $Path -eq $testWorkspacePath -and $PathType -eq 'Container' }
@@ -241,9 +242,9 @@ Describe "Find-WinPEBootWim" {
             # Mock standard path exists
             Mock Test-Path { return $true } -ParameterFilter { $Path -eq $standardBootWimPath -and $PathType -eq 'Leaf' }
             
-            $result = Find-WinPEBootWim -WorkspacePath $testWorkspacePath
+            "$result" = Find-WinPEBootWim -WorkspacePath $testWorkspacePath
             
-            $result | Should -Be $standardBootWimPath
+            "$result" | Should -Be $standardBootWimPath
             Should -Invoke Get-WindowsImage -Times 1
         }
         
@@ -255,22 +256,22 @@ Describe "Find-WinPEBootWim" {
             # Mock second alternative path exists
             Mock Test-Path { return $true } -ParameterFilter { $Path -eq $alternativeBootWimPath2 -and $PathType -eq 'Leaf' }
             
-            $result = Find-WinPEBootWim -WorkspacePath $testWorkspacePath
+            "$result" = Find-WinPEBootWim -WorkspacePath $testWorkspacePath
             
-            $result | Should -Be $alternativeBootWimPath2
+            "$result" | Should -Be $alternativeBootWimPath2
             Should -Invoke Get-WindowsImage -Times 1
         }
         
         It "Should throw an error if boot.wim is not found in any location" {
             # Mock all paths don't exist
-            Mock Test-Path { return $false } -ParameterFilter { 
-                ($Path -eq $standardBootWimPath -or 
-                 $Path -eq $alternativeBootWimPath1 -or 
-                 $Path -eq $alternativeBootWimPath2) -and 
+            Mock Test-Path { return "$false" } -ParameterFilter { 
+                ("$Path" -eq $standardBootWimPath -or 
+                 "$Path" -eq $alternativeBootWimPath1 -or 
+                 "$Path" -eq $alternativeBootWimPath2) -and 
                 $PathType -eq 'Leaf'
             }
             
-            { Find-WinPEBootWim -WorkspacePath $testWorkspacePath } | Should -Throw
+            { Find-WinPEBootWim -WorkspacePath "$testWorkspacePath" } | Should -Throw
         }
         
         It "Should throw an error if the found file is not a valid Windows image" {
@@ -279,7 +280,7 @@ Describe "Find-WinPEBootWim" {
             # Mock Get-WindowsImage to throw an error
             Mock Get-WindowsImage { throw "Not a valid Windows image file" }
             
-            { Find-WinPEBootWim -WorkspacePath $testWorkspacePath } | Should -Throw
+            { Find-WinPEBootWim -WorkspacePath "$testWorkspacePath" } | Should -Throw
         }
     }
 }
@@ -295,10 +296,10 @@ Describe "Update-WinPEWithPowerShell7" {
             $testBootWimPath = "$testWorkspacePath\Media\Sources\boot.wim"
             $testPS7Package = "TestDrive:\PowerShell-7.3.4-win-x64.zip"
             
-            New-Item -Path $testTempPath -ItemType Directory -Force
-            New-Item -Path $testWorkspacePath -ItemType Directory -Force
-            New-Item -Path $testMountPoint -ItemType Directory -Force
-            New-Item -Path $testPS7TempPath -ItemType Directory -Force
+            New-Item -Path "$testTempPath" -ItemType Directory -Force
+            New-Item -Path "$testWorkspacePath" -ItemType Directory -Force
+            New-Item -Path "$testMountPoint" -ItemType Directory -Force
+            New-Item -Path "$testPS7TempPath" -ItemType Directory -Force
             
             # Mock all helper functions
             Mock Initialize-WinPEMountPoint { 
@@ -309,11 +310,11 @@ Describe "Update-WinPEWithPowerShell7" {
                 }
             }
             
-            Mock Get-PowerShell7Package { return $testPS7Package }
+            Mock Get-PowerShell7Package { return "$testPS7Package" }
             
-            Mock Find-WinPEBootWim { return $testBootWimPath }
+            Mock Find-WinPEBootWim { return "$testBootWimPath" }
             
-            Mock Mount-WinPEImage { return $true }
+            Mock Mount-WinPEImage { return "$true" }
             
             Mock Install-PowerShell7ToWinPE { }
             
@@ -323,21 +324,21 @@ Describe "Update-WinPEWithPowerShell7" {
             
             Mock Update-WinPEStartup { }
             
-            Mock Dismount-WinPEImage { return $true }
+            Mock Dismount-WinPEImage { return "$true" }
             
             Mock Remove-Item { }
             
             # Mock Test-Path for boot.wim validation
-            Mock Test-Path { return $true } -ParameterFilter { $Path -eq $testBootWimPath }
+            Mock Test-Path { return "$true" } -ParameterFilter { $Path -eq $testBootWimPath }
             
             # Mock Test-ValidPowerShellVersion
-            Mock Test-ValidPowerShellVersion { return $true }
+            Mock Test-ValidPowerShellVersion { return "$true" }
         }
         
         It "Should complete the full workflow successfully" {
-            $result = Update-WinPEWithPowerShell7 -TemporaryPath $testTempPath -WorkspacePath $testWorkspacePath
+            "$result" = Update-WinPEWithPowerShell7 -TemporaryPath $testTempPath -WorkspacePath $testWorkspacePath
             
-            $result | Should -Be $testBootWimPath
+            "$result" | Should -Be $testBootWimPath
             Should -Invoke Initialize-WinPEMountPoint -Times 1
             Should -Invoke Get-PowerShell7Package -Times 1
             Should -Invoke Mount-WinPEImage -Times 1
@@ -350,16 +351,16 @@ Describe "Update-WinPEWithPowerShell7" {
         }
         
         It "Should use an existing PowerShell package if provided" {
-            $result = Update-WinPEWithPowerShell7 -TemporaryPath $testTempPath -WorkspacePath $testWorkspacePath -PowerShellPackageFile $testPS7Package
+            "$result" = Update-WinPEWithPowerShell7 -TemporaryPath $testTempPath -WorkspacePath $testWorkspacePath -PowerShellPackageFile $testPS7Package
             
-            $result | Should -Be $testBootWimPath
+            "$result" | Should -Be $testBootWimPath
             Should -Invoke Get-PowerShell7Package -Times 0
         }
         
         It "Should skip cleanup if SkipCleanup is specified" {
-            $result = Update-WinPEWithPowerShell7 -TemporaryPath $testTempPath -WorkspacePath $testWorkspacePath -SkipCleanup
+            "$result" = Update-WinPEWithPowerShell7 -TemporaryPath $testTempPath -WorkspacePath $testWorkspacePath -SkipCleanup
             
-            $result | Should -Be $testBootWimPath
+            "$result" | Should -Be $testBootWimPath
             Should -Invoke Remove-Item -Times 0
         }
         
@@ -368,7 +369,7 @@ Describe "Update-WinPEWithPowerShell7" {
             Mock Save-WinPEDiagnostics { return "TestDrive:\Diagnostics" }
             Mock Dismount-WindowsImage { }
             
-            { Update-WinPEWithPowerShell7 -TemporaryPath $testTempPath -WorkspacePath $testWorkspacePath } | Should -Throw
+            { Update-WinPEWithPowerShell7 -TemporaryPath "$testTempPath" -WorkspacePath $testWorkspacePath } | Should -Throw
             
             Should -Invoke Initialize-WinPEMountPoint -Times 1
             Should -Invoke Get-PowerShell7Package -Times 1

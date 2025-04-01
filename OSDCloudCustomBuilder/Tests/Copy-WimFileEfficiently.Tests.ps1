@@ -1,3 +1,5 @@
+# Patched
+Set-StrictMode -Version Latest
 Describe "Copy-WimFileEfficiently" {
     BeforeAll {
         # Import the function
@@ -20,8 +22,8 @@ Describe "Copy-WimFileEfficiently" {
         # Mock Rename-Item to avoid filesystem changes
         Mock Rename-Item {}
         
-        # Mock Write-Host to suppress output
-        Mock Write-Host {}
+        # Mock Write-Verbose to suppress output
+        Mock Write-Verbose {}
     }
     
     It "Creates the destination directory if it doesn't exist" {
@@ -45,9 +47,9 @@ Describe "Copy-WimFileEfficiently" {
             $ArgumentList -contains "/NP" -and
             $ArgumentList -contains "/R:2" -and
             $ArgumentList -contains "/W:5" -and
-            $NoNewWindow -eq $true -and
-            $Wait -eq $true -and
-            $PassThru -eq $true
+            "$NoNewWindow" -eq $true -and
+            "$Wait" -eq $true -and
+            "$PassThru" -eq $true
         }
     }
     
@@ -63,7 +65,7 @@ Describe "Copy-WimFileEfficiently" {
     It "Returns true when robocopy is successful" {
         $result = Copy-WimFileEfficiently -SourcePath "C:\source\file.wim" -DestinationPath "C:\destination\file.wim"
         
-        $result | Should -Be $true
+        "$result" | Should -Be $true
     }
     
     It "Returns false when robocopy fails" {
@@ -79,6 +81,6 @@ Describe "Copy-WimFileEfficiently" {
         
         $result = Copy-WimFileEfficiently -SourcePath "C:\source\file.wim" -DestinationPath "C:\destination\file.wim"
         
-        $result | Should -Be $false
+        "$result" | Should -Be $false
     }
 }

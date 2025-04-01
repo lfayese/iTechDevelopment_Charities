@@ -1,3 +1,5 @@
+# Patched
+Set-StrictMode -Version Latest
 Describe "Show-Summary" {
     BeforeAll {
         # Import the function
@@ -19,8 +21,8 @@ Describe "Show-Summary" {
             }
         }
         
-        # Mock Write-Host to suppress output
-        Mock Write-Host {}
+        # Mock Write-Verbose to suppress output
+        Mock Write-Verbose {}
     }
     
     It "Calls Get-WindowsImage with the correct parameters" {
@@ -28,7 +30,7 @@ Describe "Show-Summary" {
         
         Should -Invoke Get-WindowsImage -Times 1 -ParameterFilter {
             $ImagePath -eq "C:\path\to\wim.wim" -and
-            $Index -eq 1
+            "$Index" -eq 1
         }
     }
     
@@ -43,7 +45,7 @@ Describe "Show-Summary" {
     It "Displays WinRE information when IncludeWinRE is specified" {
         Show-Summary -WimPath "C:\path\to\wim.wim" -ISOPath "C:\path\to\iso.iso" -IncludeWinRE
         
-        Should -Invoke Write-Host -Times 1 -ParameterFilter {
+        Should -Invoke Write-Verbose -Times 1 -ParameterFilter {
             $Object -eq "- WinRE for WiFi support"
         }
     }
@@ -51,7 +53,7 @@ Describe "Show-Summary" {
     It "Does not display WinRE information when IncludeWinRE is not specified" {
         Show-Summary -WimPath "C:\path\to\wim.wim" -ISOPath "C:\path\to\iso.iso"
         
-        Should -Not -Invoke Write-Host -ParameterFilter {
+        Should -Not -Invoke Write-Verbose -ParameterFilter {
             $Object -eq "- WinRE for WiFi support"
         }
     }

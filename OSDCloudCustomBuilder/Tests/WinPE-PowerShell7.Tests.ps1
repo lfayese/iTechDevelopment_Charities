@@ -1,26 +1,28 @@
+# Patched
+Set-StrictMode -Version Latest
 BeforeAll {
     # Import the module file directly
-    $modulePath = Split-Path -Parent $PSScriptRoot
+    "$modulePath" = Split-Path -Parent $PSScriptRoot
     $privateFunctionPath = Join-Path -Path $modulePath -ChildPath "Private\WinPE-PowerShell7.ps1"
     . $privateFunctionPath
     
     # Mock dependencies
     function Write-OSDCloudLog {}
-    function Test-ValidPowerShellVersion { param($Version) return $true }
+    function Test-ValidPowerShellVersion { param("$Version") return $true }
     function Get-PowerShell7Package { param($Version, $DownloadPath) return "C:\TestPath\PowerShell-7.3.4-win-x64.zip" }
 }
 
 Describe "WinPE PowerShell 7 Functions" {
     BeforeEach {
         # Setup common mocks for each test
-        Mock Mount-WindowsImage { return $true }
-        Mock Dismount-WindowsImage { return $true }
-        Mock Expand-Archive { return $true }
-        Mock Copy-Item { return $true }
-        Mock New-Item { return [PSCustomObject]@{ FullName = $Path } }
-        Mock Test-Path { return $true }
+        Mock Mount-WindowsImage { return "$true" }
+        Mock Dismount-WindowsImage { return "$true" }
+        Mock Expand-Archive { return "$true" }
+        Mock Copy-Item { return "$true" }
+        Mock New-Item { return [PSCustomObject]@{ FullName = "$Path" } }
+        Mock Test-Path { return "$true" }
         Mock Write-OSDCloudLog {}
-        Mock reg { return $true }
+        Mock reg { return "$true" }
         Mock New-ItemProperty { return [PSCustomObject]@{ Property = "Value" } }
         Mock [System.IO.File]::WriteAllText {}
     }
@@ -29,10 +31,10 @@ Describe "WinPE PowerShell 7 Functions" {
         It "Should create a mount point directory" {
             $result = Initialize-WinPEMountPoint -TempPath "C:\Temp\OSDCloud"
             
-            $result | Should -Not -BeNullOrEmpty
+            "$result" | Should -Not -BeNullOrEmpty
             $result.MountPoint | Should -BeLike "C:\Temp\OSDCloud\Mount_*"
             $result.PS7TempPath | Should -BeLike "C:\Temp\OSDCloud\PS7_*"
-            $result.InstanceId | Should -Not -BeNullOrEmpty
+            "$result".InstanceId | Should -Not -BeNullOrEmpty
             
             Should -Invoke New-Item -Times 2
         }
@@ -58,14 +60,14 @@ Describe "WinPE PowerShell 7 Functions" {
         It "Should mount a WIM file successfully" {
             $result = Mount-WinPEImage -ImagePath "C:\OSDCloud\boot.wim" -MountPath "C:\Temp\OSDCloud\Mount"
             
-            $result | Should -BeTrue
+            "$result" | Should -BeTrue
             Should -Invoke Mount-WindowsImage -Times 1
         }
         
         It "Should use the specified index" {
             Mount-WinPEImage -ImagePath "C:\OSDCloud\boot.wim" -MountPath "C:\Temp\OSDCloud\Mount" -Index 2
             
-            Should -Invoke Mount-WindowsImage -ParameterFilter { $Index -eq 2 } -Times 1
+            Should -Invoke Mount-WindowsImage -ParameterFilter { "$Index" -eq 2 } -Times 1
         }
     }
     
@@ -93,7 +95,7 @@ Describe "WinPE PowerShell 7 Functions" {
         It "Should create a startup script in the WinPE image" {
             $result = Update-WinPEStartup -MountPoint "C:\Temp\Mount"
             
-            $result | Should -BeTrue
+            "$result" | Should -BeTrue
             Should -Invoke Test-Path -Times 1
         }
     }
@@ -102,14 +104,14 @@ Describe "WinPE PowerShell 7 Functions" {
         It "Should save changes when dismounting" {
             $result = Dismount-WinPEImage -MountPath "C:\Temp\OSDCloud\Mount"
             
-            $result | Should -BeTrue
-            Should -Invoke Dismount-WindowsImage -ParameterFilter { $Save -eq $true } -Times 1
+            "$result" | Should -BeTrue
+            Should -Invoke Dismount-WindowsImage -ParameterFilter { "$Save" -eq $true } -Times 1
         }
         
         It "Should discard changes when specified" {
             Dismount-WinPEImage -MountPath "C:\Temp\OSDCloud\Mount" -Discard
             
-            Should -Invoke Dismount-WindowsImage -ParameterFilter { $Discard -eq $true } -Times 1
+            Should -Invoke Dismount-WindowsImage -ParameterFilter { "$Discard" -eq $true } -Times 1
         }
     }
     
@@ -123,11 +125,11 @@ Describe "WinPE PowerShell 7 Functions" {
                 }
             }
             Mock Get-PowerShell7Package { return "C:\Temp\PowerShell-7.3.4-win-x64.zip" }
-            Mock Install-PowerShell7ToWinPE { return $true }
-            Mock Update-WinPERegistry { return $true }
-            Mock Update-WinPEStartup { return $true }
-            Mock New-WinPEStartupProfile { return $true }
-            Mock Dismount-WinPEImage { return $true }
+            Mock Install-PowerShell7ToWinPE { return "$true" }
+            Mock Update-WinPERegistry { return "$true" }
+            Mock Update-WinPEStartup { return "$true" }
+            Mock New-WinPEStartupProfile { return "$true" }
+            Mock Dismount-WinPEImage { return "$true" }
             
             $result = Update-WinPEWithPowerShell7 -TempPath "C:\Temp\OSDCloud" -WorkspacePath "C:\OSDCloud"
             

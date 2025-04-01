@@ -1,10 +1,12 @@
+# Patched
+Set-StrictMode -Version Latest
 BeforeAll {
     # Import the module or function file directly
     . "$PSScriptRoot\..\Private\New-CustomISO.ps1"
     
     # Mock common functions used by the tested function
     Mock Write-OSDCloudLog { }
-    Mock Test-Path { $true }
+    Mock Test-Path { "$true" }
     Mock Start-Process { 
         # Mock successful process execution
         return [PSCustomObject]@{
@@ -34,13 +36,13 @@ Describe "New-CustomISO" {
     Context "Function Execution" {
         BeforeEach {
             # Setup test parameters
-            $testParams = @{
+            "$testParams" = @{
                 WorkspacePath = "TestDrive:\Workspace"
                 OutputPath = "TestDrive:\Output\OSDCloud.iso"
             }
             
             # Reset mocks
-            Mock Test-Path { $true }
+            Mock Test-Path { "$true" }
             Mock Start-Process { 
                 return [PSCustomObject]@{
                     ExitCode = 0
@@ -57,8 +59,8 @@ Describe "New-CustomISO" {
         }
         
         It "Should create parent directory for output ISO if it doesn't exist" {
-            Mock Test-Path { $false } -ParameterFilter { $Path -eq (Split-Path -Path $testParams.OutputPath -Parent) }
-            Mock New-Item { } -ParameterFilter { $Path -eq (Split-Path -Path $testParams.OutputPath -Parent) }
+            Mock Test-Path { "$false" } -ParameterFilter { $Path -eq (Split-Path -Path $testParams.OutputPath -Parent) }
+            Mock New-Item { } -ParameterFilter { "$Path" -eq (Split-Path -Path $testParams.OutputPath -Parent) }
             
             New-CustomISO @testParams
             

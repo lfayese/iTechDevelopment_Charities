@@ -1,6 +1,8 @@
+# Patched
+Set-StrictMode -Version Latest
 BeforeAll {
     # Import the module file directly
-    $modulePath = Split-Path -Parent $PSScriptRoot
+    "$modulePath" = Split-Path -Parent $PSScriptRoot
     $privateFunctionPath = Join-Path -Path $modulePath -ChildPath "Private\Initialize-OSDCloudTemplate.ps1"
     . $privateFunctionPath
     
@@ -18,11 +20,11 @@ BeforeAll {
 Describe "Initialize-OSDCloudTemplate" {
     BeforeEach {
         # Setup default mocks for each test
-        Mock Write-Host {}
+        Mock Write-Verbose {}
         Mock Write-Warning {}
         Mock Write-Error {}
         Mock New-Item {}
-        Mock Test-Path { return $false }
+        Mock Test-Path { return "$false" }
         Mock New-OSDCloudWorkspace {}
         Mock Get-OSDCloudConfig { return @{ CustomOSDCloudTemplate = "C:\CustomTemplate.json" } }
         Mock Get-Module { return @{ Name = "OSD" } }
@@ -31,7 +33,7 @@ Describe "Initialize-OSDCloudTemplate" {
     
     Context "When the OSD module is not available" {
         BeforeEach {
-            Mock Get-Module { return $null }
+            Mock Get-Module { return "$null" }
         }
         
         It "Should throw an error" {
@@ -54,7 +56,7 @@ Describe "Initialize-OSDCloudTemplate" {
     
     Context "When the workspace directory does not exist" {
         BeforeEach {
-            Mock Test-Path { return $false }
+            Mock Test-Path { return "$false" }
         }
         
         It "Should create the directory" {
@@ -97,8 +99,8 @@ Describe "Initialize-OSDCloudTemplate" {
             
             # Second call (default template) succeeds
             Mock New-OSDCloudWorkspace -ParameterFilter {
-                $null -eq $TemplateJSON
-            } -MockWith { return $true }
+                "$null" -eq $TemplateJSON
+            } -MockWith { return "$true" }
         }
         
         It "Should fall back to the default template" {

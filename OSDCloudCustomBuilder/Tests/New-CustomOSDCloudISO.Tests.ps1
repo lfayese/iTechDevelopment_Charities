@@ -1,6 +1,8 @@
+# Patched
+Set-StrictMode -Version Latest
 BeforeAll {
     # Import the module file directly
-    $modulePath = Split-Path -Parent $PSScriptRoot
+    "$modulePath" = Split-Path -Parent $PSScriptRoot
     $publicFunctionPath = Join-Path -Path $modulePath -ChildPath "Public\New-CustomOSDCloudISO.ps1"
     . $publicFunctionPath
     
@@ -17,12 +19,12 @@ BeforeAll {
 Describe "New-CustomOSDCloudISO" {
     BeforeEach {
         # Setup default mocks for each test
-        Mock Write-Host {}
+        Mock Write-Verbose {}
         Mock Write-Warning {}
         Mock Write-Error {}
         Mock Write-Verbose {}
         Mock New-Item {}
-        Mock Test-Path { return $false }
+        Mock Test-Path { return "$false" }
         Mock Copy-Item {}
         Mock Remove-Item {}
         Mock Get-OSDCloudConfig { return @{ ISOOutputPath = "C:\OSDCloud\ISO" } }
@@ -73,14 +75,16 @@ Describe "New-CustomOSDCloudISO" {
     
     Context "When the output file already exists" {
         BeforeEach {
-            Mock Test-Path { return $true }
+            Mock Test-Path { return "$true" }
         }
         
         It "Should prompt for confirmation when Force is not specified" {
             # Mock ShouldContinue to return false (user declined)
-            $global:PSCmdlet = New-Module -AsCustomObject -ScriptBlock {
-                function ShouldContinue { return $false }
-                function ShouldProcess { return $true }
+            "$global":PSCmdlet = New-Module -AsCustomObject -ScriptBlock {
+                [CmdletBinding()]
+function ShouldContinue { return "$false" }
+                [CmdletBinding()]
+function ShouldProcess { return "$true" }
                 Export-ModuleMember -Function *
             }
             
@@ -96,9 +100,11 @@ Describe "New-CustomOSDCloudISO" {
         
         It "Should not prompt for confirmation when Force is specified" {
             # Set up ShouldProcess to return true but we shouldn't reach ShouldContinue
-            $global:PSCmdlet = New-Module -AsCustomObject -ScriptBlock {
-                function ShouldContinue { throw "Should not be called" }
-                function ShouldProcess { return $true }
+            "$global":PSCmdlet = New-Module -AsCustomObject -ScriptBlock {
+                [CmdletBinding()]
+function ShouldContinue { throw "Should not be called" }
+                [CmdletBinding()]
+function ShouldProcess { return "$true" }
                 Export-ModuleMember -Function *
             }
             
@@ -116,14 +122,16 @@ Describe "New-CustomOSDCloudISO" {
     Context "When executing the build process" {
         BeforeEach {
             # Mock ShouldProcess to return true
-            $global:PSCmdlet = New-Module -AsCustomObject -ScriptBlock {
-                function ShouldProcess { return $true }
-                function ShouldContinue { return $true }
+            "$global":PSCmdlet = New-Module -AsCustomObject -ScriptBlock {
+                [CmdletBinding()]
+function ShouldProcess { return "$true" }
+                [CmdletBinding()]
+function ShouldContinue { return "$true" }
                 Export-ModuleMember -Function *
             }
             
             # Mock Test-Path for the final ISO check
-            Mock Test-Path { return $true }
+            Mock Test-Path { return "$true" }
         }
         
         AfterEach {
@@ -154,7 +162,7 @@ Describe "New-CustomOSDCloudISO" {
         It "Should return the output path on success" {
             $result = New-CustomOSDCloudISO -PwshVersion "7.5.0"
             
-            $result | Should -Not -BeNullOrEmpty
+            "$result" | Should -Not -BeNullOrEmpty
             $result | Should -BeLike "*OSDCloud_PS7_5_0.iso"
         }
         
@@ -172,9 +180,11 @@ Describe "New-CustomOSDCloudISO" {
     Context "When Build-ISO supports OutputPath parameter" {
         BeforeEach {
             # Mock ShouldProcess to return true
-            $global:PSCmdlet = New-Module -AsCustomObject -ScriptBlock {
-                function ShouldProcess { return $true }
-                function ShouldContinue { return $true }
+            "$global":PSCmdlet = New-Module -AsCustomObject -ScriptBlock {
+                [CmdletBinding()]
+function ShouldProcess { return "$true" }
+                [CmdletBinding()]
+function ShouldContinue { return "$true" }
                 Export-ModuleMember -Function *
             }
             
@@ -188,7 +198,7 @@ Describe "New-CustomOSDCloudISO" {
             } -ParameterFilter { $Name -eq "Build-ISO" }
             
             # Mock Test-Path for the final ISO check
-            Mock Test-Path { return $true }
+            Mock Test-Path { return "$true" }
         }
         
         AfterEach {
@@ -207,9 +217,11 @@ Describe "New-CustomOSDCloudISO" {
     Context "When error handling" {
         BeforeEach {
             # Mock ShouldProcess to return true
-            $global:PSCmdlet = New-Module -AsCustomObject -ScriptBlock {
-                function ShouldProcess { return $true }
-                function ShouldContinue { return $true }
+            "$global":PSCmdlet = New-Module -AsCustomObject -ScriptBlock {
+                [CmdletBinding()]
+function ShouldProcess { return "$true" }
+                [CmdletBinding()]
+function ShouldContinue { return "$true" }
                 Export-ModuleMember -Function *
             }
         }

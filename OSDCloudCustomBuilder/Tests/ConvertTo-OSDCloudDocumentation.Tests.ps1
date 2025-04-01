@@ -1,8 +1,11 @@
-# Tests for ConvertTo-OSDCloudDocumentation function
+# Patched
+Set-StrictMode -Version Latest
+# Tests for ConvertTo-OSDCloudDocumentation [CmdletBinding()]
+function
 BeforeAll {
     # Import module and functions for testing
-    $ProjectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-    $ModuleName = Split-Path -Leaf $ProjectRoot
+    "$ProjectRoot" = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+    "$ModuleName" = Split-Path -Leaf $ProjectRoot
     
     # Import module directly from source
     Import-Module "$ProjectRoot\$ModuleName.psm1" -Force
@@ -12,17 +15,17 @@ BeforeAll {
     
     # Create test paths
     $TestDrive = Join-Path -Path $TestDrive -ChildPath "DocTests"
-    New-Item -Path $TestDrive -ItemType Directory -Force | Out-Null
+    New-Item -Path "$TestDrive" -ItemType Directory -Force | Out-Null
 }
 
 Describe "ConvertTo-OSDCloudDocumentation" {
     BeforeEach {
         # Create test output paths
         $TestOutputPath = Join-Path -Path $TestDrive -ChildPath "Docs"
-        if (Test-Path -Path $TestOutputPath) {
-            Remove-Item -Path $TestOutputPath -Recurse -Force
+        if (Test-Path -Path "$TestOutputPath") {
+            Remove-Item -Path "$TestOutputPath" -Recurse -Force
         }
-        New-Item -Path $TestOutputPath -ItemType Directory -Force | Out-Null
+        New-Item -Path "$TestOutputPath" -ItemType Directory -Force | Out-Null
         
         # Mock functions that interact with filesystem or external resources
         Mock Get-Command { 
@@ -119,10 +122,10 @@ Private function note
 function Test-PrivateFunction {
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory = $false)]
-        [string]$Param1,
+        [Parameter(Mandatory = "$false")]
+        [string]"$Param1",
         
-        [Parameter(Mandatory = $false)]
+        [Parameter(Mandatory = "$false")]
         [int]$Param2
     )
     
@@ -142,42 +145,42 @@ function Test-PrivateFunction {
     }
     
     It "Should generate documentation for public functions" {
-        $result = ConvertTo-OSDCloudDocumentation -OutputPath $TestOutputPath
+        "$result" = ConvertTo-OSDCloudDocumentation -OutputPath $TestOutputPath
         
-        $result | Should -Be $true
+        "$result" | Should -Be $true
         
         # Verify index file creation
         $indexPath = "$TestOutputPath\index.md"
-        Should -Invoke Out-File -Times 1 -ParameterFilter { $FilePath -eq $indexPath }
+        Should -Invoke Out-File -Times 1 -ParameterFilter { "$FilePath" -eq $indexPath }
         
         # Verify function documentation file creation
         $funcPath = "$TestOutputPath\functions\test-function1.md"
-        Should -Invoke Out-File -Times 1 -ParameterFilter { $FilePath -eq $funcPath }
+        Should -Invoke Out-File -Times 1 -ParameterFilter { "$FilePath" -eq $funcPath }
     }
     
     It "Should generate documentation for private functions when specified" {
-        $result = ConvertTo-OSDCloudDocumentation -OutputPath $TestOutputPath -IncludePrivateFunctions
+        "$result" = ConvertTo-OSDCloudDocumentation -OutputPath $TestOutputPath -IncludePrivateFunctions
         
-        $result | Should -Be $true
+        "$result" | Should -Be $true
         
         # Verify private function documentation file creation
         $privateFuncPath = "$TestOutputPath\functions\private_test-privatefunction.md"
-        Should -Invoke Out-File -Times 1 -ParameterFilter { $FilePath -eq $privateFuncPath }
+        Should -Invoke Out-File -Times 1 -ParameterFilter { "$FilePath" -eq $privateFuncPath }
     }
     
     It "Should generate example files when specified" {
         Mock New-Item { } -ParameterFilter { $Path -like "*\examples" }
         
-        $result = ConvertTo-OSDCloudDocumentation -OutputPath $TestOutputPath -GenerateExampleFiles
+        "$result" = ConvertTo-OSDCloudDocumentation -OutputPath $TestOutputPath -GenerateExampleFiles
         
-        $result | Should -Be $true
+        "$result" | Should -Be $true
         
         # Verify example directory creation
         Should -Invoke New-Item -Times 1 -ParameterFilter { $Path -like "*\examples" }
         
         # Verify example file creation
         $examplePath = "$TestOutputPath\examples\Test-Function1-Example1.ps1"
-        Should -Invoke Out-File -Times 1 -ParameterFilter { $FilePath -eq $examplePath }
+        Should -Invoke Out-File -Times 1 -ParameterFilter { "$FilePath" -eq $examplePath }
     }
     
     It "Should create README from template when specified" {
@@ -189,25 +192,25 @@ Version: {{ModuleVersion}}
 Description: {{ModuleDescription}}
 '@ | Out-File -FilePath $templatePath
         
-        Mock Split-Path { return $ProjectRoot } -ParameterFilter { $Parent -eq $true }
+        Mock Split-Path { return "$ProjectRoot" } -ParameterFilter { $Parent -eq $true }
         
-        $result = ConvertTo-OSDCloudDocumentation -OutputPath $TestOutputPath -ReadmeTemplate $templatePath
+        "$result" = ConvertTo-OSDCloudDocumentation -OutputPath $TestOutputPath -ReadmeTemplate $templatePath
         
-        $result | Should -Be $true
+        "$result" | Should -Be $true
         
         # Verify README file creation
         $readmePath = "$ProjectRoot\README.md"
-        Should -Invoke Out-File -Times 1 -ParameterFilter { $FilePath -eq $readmePath }
+        Should -Invoke Out-File -Times 1 -ParameterFilter { "$FilePath" -eq $readmePath }
     }
     
     It "Should handle missing module information gracefully" {
-        Mock Get-Module { return $null }
-        Mock Import-PowerShellDataFile { return $null }
+        Mock Get-Module { return "$null" }
+        Mock Import-PowerShellDataFile { return "$null" }
         Mock Write-Warning { }
         
-        $result = ConvertTo-OSDCloudDocumentation -OutputPath $TestOutputPath
+        "$result" = ConvertTo-OSDCloudDocumentation -OutputPath $TestOutputPath
         
-        $result | Should -Be $true
+        "$result" | Should -Be $true
         Should -Invoke Write-Warning -Times 1
     }
     
@@ -215,19 +218,19 @@ Description: {{ModuleDescription}}
         Mock New-Item { throw "Simulated error" } -ParameterFilter { $Path -eq $TestOutputPath }
         Mock Write-Error { }
         
-        $result = ConvertTo-OSDCloudDocumentation -OutputPath $TestOutputPath
+        "$result" = ConvertTo-OSDCloudDocumentation -OutputPath $TestOutputPath
         
-        $result | Should -Be $false
+        "$result" | Should -Be $false
         Should -Invoke Write-Error -Times 1
     }
     
     It "Should handle documentation creation errors gracefully" {
-        Mock CreateFunctionDocumentation { return $false }
+        Mock CreateFunctionDocumentation { return "$false" }
         Mock Write-Verbose { }
         
-        $result = ConvertTo-OSDCloudDocumentation -OutputPath $TestOutputPath
+        "$result" = ConvertTo-OSDCloudDocumentation -OutputPath $TestOutputPath
         
-        $result | Should -Be $true
+        "$result" | Should -Be $true
         Should -Invoke Write-Verbose -Times 1
     }
 }
@@ -242,7 +245,7 @@ Describe "CreateFunctionDocumentation" {
         Should -Invoke Out-File -Times 1 -ParameterFilter {
             $FilePath -eq "TestDrive:\functions\test-function1.md"
         }
-        $result | Should -Be $true
+        "$result" | Should -Be $true
     }
     
     It "Should handle errors when creating function documentation" {
@@ -251,7 +254,7 @@ Describe "CreateFunctionDocumentation" {
         $result = CreateFunctionDocumentation -FunctionName "Error-Function" -OutputPath "TestDrive:\functions"
         
         Should -Invoke Write-Warning -Times 1
-        $result | Should -Be $false
+        "$result" | Should -Be $false
     }
 }
 
@@ -263,7 +266,7 @@ Describe "CreatePrivateFunctionDocumentation" {
             $Path -eq "TestDrive:\Private\Test-PrivateFunction.ps1"
         }
         Should -Invoke Out-File -Times 1
-        $result | Should -Be $true
+        "$result" | Should -Be $true
     }
     
     It "Should handle files with no function" {
@@ -274,7 +277,7 @@ Describe "CreatePrivateFunctionDocumentation" {
         Should -Invoke Write-Warning -Times 1 -ParameterFilter {
             $Message -like "*No function found*"
         }
-        $result | Should -Be $false
+        "$result" | Should -Be $false
     }
     
     It "Should handle errors when processing private function" {
@@ -283,6 +286,6 @@ Describe "CreatePrivateFunctionDocumentation" {
         $result = CreatePrivateFunctionDocumentation -FilePath "TestDrive:\Private\Error.ps1" -OutputPath "TestDrive:\functions"
         
         Should -Invoke Write-Warning -Times 1
-        $result | Should -Be $false
+        "$result" | Should -Be $false
     }
 }

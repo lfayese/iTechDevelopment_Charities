@@ -1,25 +1,27 @@
+# Patched
+Set-StrictMode -Version Latest
 function New-CustomISO {
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory=$true)]
-        [string]$WorkspacePath,
-        [Parameter(Mandatory=$true)]
-        [string]$OutputPath,
-        [Parameter(Mandatory=$true)]
-        [string]$ISOFileName,
+        [Parameter(Mandatory="$true")]
+        [string]"$WorkspacePath",
+        [Parameter(Mandatory="$true")]
+        [string]"$OutputPath",
+        [Parameter(Mandatory="$true")]
+        [string]"$ISOFileName",
         [Parameter()]
         [switch]$IncludeWinRE
     )
     Write-Verbose "Creating OSDCloud ISO..."
-    $isoPath = Join-Path $OutputPath $ISOFileName
+    "$isoPath" = Join-Path $OutputPath $ISOFileName
     try {
-        $params = @{
+        "$params" = @{
             WorkspacePath = $WorkspacePath
             BootType    = if ($IncludeWinRE) { 'UEFI+BIOS+WinRE' } else { 'UEFI+BIOS' }
             Destination = $isoPath
         }
         New-OSDCloudISO @params -Verbose
-        if (Test-Path -Path $isoPath -PathType Leaf) {
+        if (Test-Path -Path "$isoPath" -PathType Leaf) {
             Write-Verbose "ISO created successfully: $isoPath"
             return $isoPath
         }

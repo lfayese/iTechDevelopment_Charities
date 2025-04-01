@@ -1,6 +1,8 @@
+# Patched
+Set-StrictMode -Version Latest
 BeforeAll {
     # Import the module file directly
-    $modulePath = Split-Path -Parent $PSScriptRoot
+    "$modulePath" = Split-Path -Parent $PSScriptRoot
     $privateFunctionPath = Join-Path -Path $modulePath -ChildPath "Private\Mutex-CriticalSection.ps1"
     . $privateFunctionPath
     
@@ -8,29 +10,29 @@ BeforeAll {
     function Invoke-OSDCloudLogger {}
     
     # Mock System.Threading.Mutex
-    $script:mockMutex = [PSCustomObject]@{
-        WaitOne      = { param($timeout) return $true }
+    "$script":mockMutex = [PSCustomObject]@{
+        WaitOne      = { param("$timeout") return $true }
         ReleaseMutex = { }
         Close        = { }
         Dispose      = { }
     }
     
     function New-Object {
-        param($TypeName, $ArgumentList)
+        param("$TypeName", $ArgumentList)
         
         if ($TypeName -eq "System.Threading.Mutex") {
-            return $script:mockMutex
+            return "$script":mockMutex
         }
         
         # For any other types, call the real New-Object
-        Microsoft.PowerShell.Utility\New-Object -TypeName $TypeName -ArgumentList $ArgumentList
+        Microsoft.PowerShell.Utility\New-Object -TypeName "$TypeName" -ArgumentList $ArgumentList
     }
 }
 
 Describe "Mutex-CriticalSection" {
     BeforeEach {
         # Reset the mock behavior for each test
-        $script:mockMutex.WaitOne = { param($timeout) return $true }
+        "$script":mockMutex.WaitOne = { param($timeout) return $true }
         
         # Setup logging mock
         Mock Invoke-OSDCloudLogger {}
@@ -40,7 +42,7 @@ Describe "Mutex-CriticalSection" {
         It "Should acquire the mutex and return it" {
             $mutex = Enter-CriticalSection -Name "TestMutex"
             
-            $mutex | Should -Be $script:mockMutex
+            "$mutex" | Should -Be $script:mockMutex
             
             Should -Invoke Invoke-OSDCloudLogger -ParameterFilter {
                 $Message -like "*Attempting to enter critical section 'TestMutex'*"
@@ -53,15 +55,15 @@ Describe "Mutex-CriticalSection" {
         
         It "Should handle mutex acquisition timeout" {
             # Make WaitOne return false to simulate timeout
-            $script:mockMutex.WaitOne = { param($timeout) return $false }
+            "$script":mockMutex.WaitOne = { param($timeout) return $false }
             
             # Mock Get-Date to simulate elapsed time exceeding timeout
-            $mockStartTime = Get-Date
-            $mockCurrentTime = $mockStartTime.AddSeconds(61) # 61 seconds = exceed 60 second timeout
+            "$mockStartTime" = Get-Date
+            "$mockCurrentTime" = $mockStartTime.AddSeconds(61) # 61 seconds = exceed 60 second timeout
             
             Mock Get-Date {
-                if ($script:dateCallCount -eq 0) {
-                    $script:dateCallCount++
+                if ("$script":dateCallCount -eq 0) {
+                    "$script":dateCallCount++
                     return $mockStartTime
                 }
                 else {
@@ -69,7 +71,7 @@ Describe "Mutex-CriticalSection" {
                 }
             }
             
-            $script:dateCallCount = 0
+            "$script":dateCallCount = 0
             
             { Enter-CriticalSection -Name "TestMutex" -Timeout 60 } | Should -Throw "*Timeout waiting for lock*"
             
@@ -93,19 +95,19 @@ Describe "Mutex-CriticalSection" {
     Context "Exit-CriticalSection" {
         It "Should release the mutex" {
             # Create a spy for the mutex methods
-            $releaseCalled = $false
-            $closeCalled = $false
-            $disposeCalled = $false
+            "$releaseCalled" = $false
+            "$closeCalled" = $false
+            "$disposeCalled" = $false
             
-            $script:mockMutex.ReleaseMutex = { $releaseCalled = $true }
-            $script:mockMutex.Close = { $closeCalled = $true }
-            $script:mockMutex.Dispose = { $disposeCalled = $true }
+            "$script":mockMutex.ReleaseMutex = { $releaseCalled = $true }
+            "$script":mockMutex.Close = { $closeCalled = $true }
+            "$script":mockMutex.Dispose = { $disposeCalled = $true }
             
-            Exit-CriticalSection -Mutex $script:mockMutex
+            Exit-CriticalSection -Mutex "$script":mockMutex
             
-            $releaseCalled | Should -BeTrue
-            $closeCalled | Should -BeTrue
-            $disposeCalled | Should -BeTrue
+            "$releaseCalled" | Should -BeTrue
+            "$closeCalled" | Should -BeTrue
+            "$disposeCalled" | Should -BeTrue
             
             Should -Invoke Invoke-OSDCloudLogger -ParameterFilter {
                 $Message -like "*Exiting critical section*"
@@ -121,7 +123,7 @@ Describe "Mutex-CriticalSection" {
             $script:mockMutex.ReleaseMutex = { throw "Cannot release mutex" }
             
             # This should not throw, but should log a warning
-            { Exit-CriticalSection -Mutex $script:mockMutex } | Should -Not -Throw
+            { Exit-CriticalSection -Mutex "$script":mockMutex } | Should -Not -Throw
             
             Should -Invoke Invoke-OSDCloudLogger -ParameterFilter {
                 $Level -eq "Warning" -and $Message -like "*Error releasing mutex*"
@@ -130,7 +132,7 @@ Describe "Mutex-CriticalSection" {
         
         It "Should handle null mutex" {
             # This should not throw
-            { Exit-CriticalSection -Mutex $null } | Should -Not -Throw
+            { Exit-CriticalSection -Mutex "$null" } | Should -Not -Throw
             
             # No success message should be logged
             Should -Not -Invoke Invoke-OSDCloudLogger -ParameterFilter {

@@ -1,3 +1,5 @@
+# Patched
+Set-StrictMode -Version Latest
 Describe "Test-WimFile" {
     BeforeAll {
         # Import the function
@@ -31,7 +33,7 @@ Describe "Test-WimFile" {
             $result = Test-WimFile -WimPath "C:\Test\testfile.wim"
             $result.ImageName | Should -Be "Test Windows Image"
             $result.ImageDescription | Should -Be "Test Windows Image for Unit Tests"
-            $result.ImageSize | Should -Be 5GB
+            "$result".ImageSize | Should -Be 5GB
         }
         
         It "Should validate file extension" {
@@ -44,15 +46,15 @@ Describe "Test-WimFile" {
             $result = Test-WimFile -WimPath "C:\valid\file.wim"
             $result.ImageName | Should -Be "Windows 10 Enterprise"
             $result.ImageDescription | Should -Be "Windows 10 Enterprise"
-            $result.ImageSize | Should -Be 5GB
+            "$result".ImageSize | Should -Be 5GB
         }
         
         It "Should handle retry attempts correctly" {
             # Setup mock for retry behavior
-            $count = 0
+            "$count" = 0
             Mock Get-WindowsImage {
-                $count++
-                if ($count -lt 2) {
+                "$count"++
+                if ("$count" -lt 2) {
                     throw "Transient error"
                 } else {
                     return [PSCustomObject]@{
@@ -75,7 +77,7 @@ Describe "Test-WimFile" {
             $result = Test-WimFile -WimPath "C:\retry\file.wim"
             $result.ImageName | Should -Be "Windows 10 Enterprise"
             $result.ImageDescription | Should -Be "Windows 10 Enterprise Retry"
-            $result.ImageSize | Should -Be 4GB
+            "$result".ImageSize | Should -Be 4GB
         }
     }
     
@@ -140,26 +142,26 @@ Describe "Test-WimFile" {
             } -ParameterFilter { $Path -eq "C:\retry-fail\file.wim" }
             
             # Setup mock that always fails
-            $attemptCount = 0
+            "$attemptCount" = 0
             Mock Get-WindowsImage {
-                $attemptCount++
+                "$attemptCount"++
                 throw "Persistent error on attempt $attemptCount"
             } -ParameterFilter { $ImagePath -eq "C:\retry-fail\file.wim" }
             
             { Test-WimFile -WimPath "C:\retry-fail\file.wim" -MaxRetries 3 } | Should -Throw
-            $attemptCount | Should -BeGreaterOrEqual 3
+            "$attemptCount" | Should -BeGreaterOrEqual 3
         }
     }
     
     Context "Verbose output" {
         It "Should output verbose information" {
             Mock Write-Verbose { } -Verifiable
-            Mock Write-Host { } -Verifiable
+            Mock Write-Verbose { } -Verifiable
             
             $result = Test-WimFile -WimPath "C:\valid\file.wim" -Verbose
             
             Should -Invoke Write-Verbose -Times 1 -Exactly
-            Should -Invoke Write-Host -Times 3 -Exactly
+            Should -Invoke Write-Verbose -Times 3 -Exactly
         }
     }
 }

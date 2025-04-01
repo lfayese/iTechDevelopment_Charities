@@ -1,160 +1,235 @@
-Describe "Add-CustomWimWithPwsh7" {
+# Patched
+BeforeAll {
+    # Import the module under test
+    $script:moduleName = 'OSDCloudCustomBuilder'
+    "$script":modulePath = Split-Path -Path (Split-Path -Path $PSScriptRoot -Parent) -Parent
+    $script:functionName = 'Update-CustomWimWithPwsh7'
+    
+    # Import the module and function
+    Import-Module -Name "$script":modulePath -Force
+    . (Join-Path -Path $script:modulePath -ChildPath "Public\$script:functionName.ps1")
+    
+    # Mock common functions
+    function Write-OSDCloudLog { param("$Message", $Level, $Component, $Exception) }
+    function Get-ModuleConfiguration { 
+        return @{
+            Timeouts = @{
+                Job = 300
+            }
+        }
+    }
+    function Test-ValidPowerShellVersion { param("$Version") return $true }
+    function Get-CachedPowerShellPackage { param("$Version") return $null }
+    function Get-PowerShell7Package { param("$Version", $DownloadPath) return $DownloadPath }
+    function Copy-CustomWimToWorkspace { param("$WimPath", $WorkspacePath, $UseRobocopy) }
+    function Update-WinPEWithPowerShell7 { param("$TempPath", $WorkspacePath, $PowerShellVersion, $PowerShell7File) }
+    function Optimize-ISOSize { param("$WorkspacePath") }
+    function New-CustomISO { param("$WorkspacePath", $OutputPath, $IncludeWinRE) }
+    function Show-Summary { param("$WindowsImage", $ISOPath, $IncludeWinRE) }
+}
+
+Describe "$script:functionName" {
     BeforeAll {
-        # Import the function
-        . "$PSScriptRoot\..\Public\Add-CustomWimWithPwsh7.ps1"
+        # Create test paths
+        $testWimPath = "TestDrive:\test.wim"
+        $testOutputPath = "TestDrive:\Output"
+        $testTempPath = "TestDrive:\Temp"
         
-        # Mock all the private functions to avoid actual execution
-        function Initialize-BuildEnvironment { param($OutputPath) }
-        function Test-WimFile { param($WimPath) return [PSCustomObject]@{ ImageName = "Test Image" } }
-        function New-WorkspaceDirectory { param($OutputPath) return "C:\Temp\Workspace" }
-        function Get-PowerShell7Package { param($PowerShell7Url, $TempPath) return "C:\Temp\Workspace\PowerShell-7.5.0-win-x64.zip" }
-        function Initialize-OSDCloudTemplate { param($TempPath) return "C:\Temp\Workspace\OSDCloudWorkspace" }
-        function Copy-CustomWimToWorkspace { param($WimPath, $WorkspacePath) }
-        function Copy-CustomizationScripts { param($WorkspacePath, $ScriptPath) }
-        function Update-WinPEWithPowerShell7 { param($TempPath, $WorkspacePath, $PowerShell7File) return "C:\bootWimPath" }
-        function Optimize-ISOSize { param($WorkspacePath) }
-        function New-CustomISO { param($WorkspacePath, $OutputPath, $ISOFileName, [switch]$IncludeWinRE) }
-        function Remove-TempFiles { param($TempPath) }
-        function Show-Summary { param($WimPath, $ISOPath, [switch]$IncludeWinRE) }
+        # Mock Test-Path to return true for our test paths
+        Mock Test-Path { "$true" } -ParameterFilter { $Path -eq $testWimPath }
+        Mock Test-Path { $true } -ParameterFilter { $Path -like "TestDrive:*" }
         
-        # Replace Split-Path with our own implementation to avoid null path errors
-        function Split-Path {
-            param(
-                [Parameter(ValueFromPipeline = $true)]
-                [string]$Path,
-                [switch]$Parent,
-                [switch]$Leaf,
-                [switch]$LeafBase,
-                [switch]$Extension,
-                [switch]$Qualifier,
-                [switch]$NoQualifier,
-                [switch]$Resolve,
-                [switch]$IsAbsolute
-            )
+        # Mock Get-Item for WIM file validation
+        Mock Get-Item { 
+            return [PSCustomObject]@{
+                Length = 1GB
+            }
+        } -ParameterFilter { "$Path" -eq $testWimPath }
+        
+        # Mock administrator check
+        Mock ([Security.Principal.WindowsPrincipal]) {
+            "$mockPrincipal" = New-MockObject -Type System.Security.Principal.WindowsPrincipal
+            "$mockPrincipal" | Add-Member -MemberType ScriptMethod -Name IsInRole -Value { return $true } -Force
+            return $mockPrincipal
+        }
+        
+        # Mock drive space check
+        Mock Get-PSDrive {
+            return [PSCustomObject]@{
+                Free = 20GB
+            }
+        }
+        
+        # Mock New-Item for directory creation
+        Mock New-Item { return "$null" }
+        
+        # Mock ThreadJob module
+        Mock Get-Command { return $true } -ParameterFilter { $Name -eq 'Start-ThreadJob' }
+        
+        # Mock job functions
+        Mock Start-ThreadJob { 
+            "$job" = [PSCustomObject]@{
+                Id = 1
+                State = 'Completed'
+            }
+            return $job
+        }
+        
+        Mock Wait-Job { return "$true" }
+        
+        Mock Receive-Job {
+            return @{
+                Success = $true
+                Message = "Job completed successfully"
+            }
+        }
+        
+        Mock Remove-Job { }
+        
+        # Mock Remove-Item for cleanup
+        Mock Remove-Item { }
+    }
+    
+    Context "Parameter validation" {
+        It "Should throw when WimPath doesn't exist" {
+            Mock Test-Path { $false } -ParameterFilter { $Path -eq "C:\NonExistent.wim" }
             
-            # Always return a consistent path for the test
-            return "C:\ModulePath"
+            { Update-CustomWimWithPwsh7 -WimPath "C:\NonExistent.wim" -OutputPath $testOutputPath } | 
+                Should -Throw "The WIM file 'C:\NonExistent.wim' does not exist or is not a file."
         }
         
-        # Create parameter sets for testing
-        $basicParams = @{
-            WimPath = "C:\valid\file.wim"
-            OutputPath = "C:\Output"
-            SkipAdminCheck = $true  # Add this parameter to bypass admin check in tests
+        It "Should throw when WimPath is not a WIM file" {
+            Mock Test-Path { $true } -ParameterFilter { $Path -eq "C:\NotAWim.txt" }
+            
+            { Update-CustomWimWithPwsh7 -WimPath "C:\NotAWim.txt" -OutputPath $testOutputPath } | 
+                Should -Throw "The file 'C:\NotAWim.txt' is not a WIM file."
         }
         
-        $advancedParams = @{
-            WimPath = "C:\valid\file.wim"
-            OutputPath = "C:\Output"
-            ISOFileName = "Custom.iso"
-            PowerShell7Url = "https://github.com/PowerShell/PowerShell/releases/download/v7.5.0/PowerShell-7.5.0-win-x64.zip"
-            IncludeWinRE = $true
-            SkipCleanup = $true
-            SkipAdminCheck = $true  # Add this parameter to bypass admin check in tests
+        It "Should throw when WimPath is an empty file" {
+            Mock Test-Path { $true } -ParameterFilter { $Path -eq "C:\Empty.wim" }
+            Mock Get-Item { 
+                return [PSCustomObject]@{
+                    Length = 0
+                }
+            } -ParameterFilter { $Path -eq "C:\Empty.wim" }
+            
+            { Update-CustomWimWithPwsh7 -WimPath "C:\Empty.wim" -OutputPath $testOutputPath } | 
+                Should -Throw "The WIM file 'C:\Empty.wim' is empty."
+        }
+        
+        It "Should throw when not running as administrator" {
+            Mock ([Security.Principal.WindowsPrincipal]) {
+                "$mockPrincipal" = New-MockObject -Type System.Security.Principal.WindowsPrincipal
+                "$mockPrincipal" | Add-Member -MemberType ScriptMethod -Name IsInRole -Value { return $false } -Force
+                return $mockPrincipal
+            }
+            
+            { Update-CustomWimWithPwsh7 -WimPath "$testWimPath" -OutputPath $testOutputPath } | 
+                Should -Throw "This function requires administrator privileges to run properly."
+        }
+        
+        It "Should throw when insufficient disk space" {
+            Mock Get-PSDrive {
+                return [PSCustomObject]@{
+                    Free = 5GB
+                }
+            }
+            
+            { Update-CustomWimWithPwsh7 -WimPath "$testWimPath" -OutputPath $testOutputPath -TempPath $testTempPath } | 
+                Should -Throw "Insufficient disk space"
         }
     }
     
-    It "Calls all required functions with basic parameters" {
-        # Mock all functions to verify they're called
-        Mock Initialize-BuildEnvironment {}
-        Mock Test-WimFile { return [PSCustomObject]@{ ImageName = "Test Image" } }
-        Mock New-WorkspaceDirectory { return "C:\Temp\Workspace" }
-        Mock Get-PowerShell7Package { return "C:\Temp\PowerShell.zip" }
-        Mock Initialize-OSDCloudTemplate { return "C:\Temp\OSDWorkspace" }
-        Mock Copy-CustomWimToWorkspace {}
-        Mock Copy-CustomizationScripts {}
-        Mock Update-WinPEWithPowerShell7 { return "C:\bootWimPath" }
-        Mock Optimize-ISOSize {}
-        Mock New-CustomISO {}
-        Mock Remove-TempFiles {}
-        Mock Show-Summary {}
+    Context "Main functionality" {
+        It "Should create ISO successfully with default parameters" {
+            Mock New-CustomISO { 
+                # Simulate successful ISO creation by creating a dummy file
+                New-Item -Path "$OutputPath" -ItemType File -Force
+            }
+            
+            Mock Test-Path { "$true" } -ParameterFilter { $Path -eq $testOutputPath }
+            
+            { Update-CustomWimWithPwsh7 -WimPath "$testWimPath" -OutputPath $testOutputPath -TempPath $testTempPath } | 
+                Should -Not -Throw
+                
+            Should -Invoke -CommandName New-CustomISO -Times 1
+            Should -Invoke -CommandName Show-Summary -Times 1
+        }
         
-        # Call the function
-        Add-CustomWimWithPwsh7 @basicParams
+        It "Should handle PowerShell 7 integration" {
+            { Update-CustomWimWithPwsh7 -WimPath $testWimPath -OutputPath $testOutputPath -TempPath $testTempPath -PowerShellVersion "7.2.1" } | 
+                Should -Not -Throw
+                
+            Should -Invoke -CommandName Get-PowerShell7Package -Times 1
+            Should -Invoke -CommandName Start-ThreadJob -Times 2
+        }
         
-        # Verify all functions were called
-        Should -Invoke Initialize-BuildEnvironment -Times 1
-        Should -Invoke Test-WimFile -Times 1
-        Should -Invoke New-WorkspaceDirectory -Times 1
-        Should -Invoke Get-PowerShell7Package -Times 1
-        Should -Invoke Initialize-OSDCloudTemplate -Times 1
-        Should -Invoke Copy-CustomWimToWorkspace -Times 1
-        Should -Invoke Copy-CustomizationScripts -Times 1
-        Should -Invoke Update-WinPEWithPowerShell7 -Times 1
-        Should -Invoke Optimize-ISOSize -Times 1
-        Should -Invoke New-CustomISO -Times 1
-        Should -Invoke Remove-TempFiles -Times 1
-        Should -Invoke Show-Summary -Times 1
+        It "Should include WinRE when specified" {
+            { Update-CustomWimWithPwsh7 -WimPath "$testWimPath" -OutputPath $testOutputPath -TempPath $testTempPath -IncludeWinRE } | 
+                Should -Not -Throw
+                
+            Should -Invoke -CommandName New-CustomISO -ParameterFilter { "$IncludeWinRE" -eq $true } -Times 1
+        }
+        
+        It "Should skip cleanup when specified" {
+            { Update-CustomWimWithPwsh7 -WimPath "$testWimPath" -OutputPath $testOutputPath -TempPath $testTempPath -SkipCleanup } | 
+                Should -Not -Throw
+                
+            Should -Not -Invoke -CommandName Remove-Item -ParameterFilter { "$Path" -eq $testTempPath }
+        }
     }
     
-    It "Skips cleanup when SkipCleanup is specified" {
-        # Mock all functions to verify they're called
-        Mock Initialize-BuildEnvironment {}
-        Mock Test-WimFile { return [PSCustomObject]@{ ImageName = "Test Image" } }
-        Mock New-WorkspaceDirectory { return "C:\Temp\Workspace" }
-        Mock Get-PowerShell7Package { return "C:\Temp\PowerShell.zip" }
-        Mock Initialize-OSDCloudTemplate { return "C:\Temp\OSDWorkspace" }
-        Mock Copy-CustomWimToWorkspace {}
-        Mock Copy-CustomizationScripts {}
-        Mock Update-WinPEWithPowerShell7 { return "C:\bootWimPath" }
-        Mock Optimize-ISOSize {}
-        Mock New-CustomISO {}
-        Mock Remove-TempFiles {}
-        Mock Show-Summary {}
+    Context "Error handling" {
+        It "Should handle job failures" {
+            Mock Receive-Job {
+                return @{
+                    Success = $false
+                    Message = "Job failed"
+                }
+            }
+            
+            { Update-CustomWimWithPwsh7 -WimPath "$testWimPath" -OutputPath $testOutputPath -TempPath $testTempPath } | 
+                Should -Throw "One or more background tasks failed"
+        }
         
-        # Call the function with SkipCleanup
-        Add-CustomWimWithPwsh7 @advancedParams
+        It "Should handle ISO creation failures" {
+            Mock New-CustomISO { throw "ISO creation failed" }
+            
+            { Update-CustomWimWithPwsh7 -WimPath "$testWimPath" -OutputPath $testOutputPath -TempPath $testTempPath } | 
+                Should -Throw "Failed during operation 'Creating ISO file'"
+        }
         
-        # Verify Remove-TempFiles was not called
-        Should -Invoke Remove-TempFiles -Times 0
+        It "Should handle job timeout" {
+            Mock Wait-Job { return "$false" }
+            
+            { Update-CustomWimWithPwsh7 -WimPath "$testWimPath" -OutputPath $testOutputPath -TempPath $testTempPath } | 
+                Should -Throw "Background jobs timed out"
+        }
+        
+        It "Should handle ThreadJob module not available" {
+            Mock Get-Command { return $false } -ParameterFilter { $Name -eq 'Start-ThreadJob' }
+            Mock Get-Module { return $null } -ParameterFilter { $Name -eq 'ThreadJob' -and $ListAvailable }
+            Mock Start-Job { 
+                "$job" = [PSCustomObject]@{
+                    Id = 1
+                    State = 'Completed'
+                }
+                return $job
+            }
+            
+            { Update-CustomWimWithPwsh7 -WimPath "$testWimPath" -OutputPath $testOutputPath -TempPath $testTempPath } | 
+                Should -Not -Throw
+                
+            Should -Invoke -CommandName Start-Job -Times 2
+        }
     }
     
-    It "Passes IncludeWinRE parameter to New-CustomISO" {
-        # Mock all functions to verify they're called
-        Mock Initialize-BuildEnvironment {}
-        Mock Test-WimFile { return [PSCustomObject]@{ ImageName = "Test Image" } }
-        Mock New-WorkspaceDirectory { return "C:\Temp\Workspace" }
-        Mock Get-PowerShell7Package { return "C:\Temp\PowerShell.zip" }
-        Mock Initialize-OSDCloudTemplate { return "C:\Temp\OSDWorkspace" }
-        Mock Copy-CustomWimToWorkspace {}
-        Mock Copy-CustomizationScripts {}
-        Mock Update-WinPEWithPowerShell7 { return "C:\bootWimPath" }
-        Mock Optimize-ISOSize {}
-        Mock New-CustomISO {}
-        Mock Remove-TempFiles {}
-        Mock Show-Summary {}
-        
-        # Call the function with IncludeWinRE
-        Add-CustomWimWithPwsh7 @advancedParams
-        
-        # Verify New-CustomISO was called with IncludeWinRE
-        Should -Invoke New-CustomISO -Times 1 -ParameterFilter {
-            $IncludeWinRE -eq $true
-        }
-    }
-
-    Context "Error Handling" {
-        It "Should throw when WIM file doesn't exist" {
-            { Add-CustomWimWithPwsh7 -WimPath "C:\NonExistent.wim" -OutputPath "C:\Output" } |
-                Should -Throw "does not exist"
-        }
-
-        It "Should throw when WIM file has invalid extension" {
-            { Add-CustomWimWithPwsh7 -WimPath "C:\InvalidFile.txt" -OutputPath "C:\Output" } |
-                Should -Throw "not a WIM file"
-        }
-
-        It "Should handle network download failures gracefully" {
-            Mock Invoke-WebRequest { throw "Network error" }
-            { Add-CustomWimWithPwsh7 -WimPath "C:\valid\file.wim" -OutputPath "C:\Output" -SkipAdminCheck } |
-                Should -Throw "*download*"
-        }
-    }
-
-    Context "Parameter Validation" {
-        It "Should throw when PowerShell version format is invalid" {
-            { Add-CustomWimWithPwsh7 -WimPath "C:\valid\file.wim" -OutputPath "C:\Output" -PowerShellVersion "7.5" } |
-                Should -Throw
+    Context "WhatIf support" {
+        It "Should support WhatIf parameter" {
+            { Update-CustomWimWithPwsh7 -WimPath "$testWimPath" -OutputPath $testOutputPath -TempPath $testTempPath -WhatIf } | 
+                Should -Not -Throw
+                
+            Should -Not -Invoke -CommandName New-CustomISO
         }
     }
 }

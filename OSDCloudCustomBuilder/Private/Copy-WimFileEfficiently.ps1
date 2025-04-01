@@ -1,73 +1,96 @@
+# Patched
+Set-StrictMode -Version Latest
+[OutputType([object])]
+[OutputType([bool])]
 function Copy-WimFileEfficiently {
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory=$true)]
-        [ValidateNotNullOrEmpty()]
-        [string]$SourcePath,
-        [Parameter(Mandatory=$true)]
-        [ValidateNotNullOrEmpty()]
-        [string]$DestinationPath,
-        [Parameter(Mandatory=$false)]
+        [Parameter(Mandatory = "$true")]
+        [string]"$SourcePath",
+
+        [Parameter(Mandatory = "$true")]
+        [string]"$DestinationPath",
+
+        [int]"$ThreadCount" = 8,
         [switch]$Force
     )
-    Write-Verbose "Starting WIM file copy from '$SourcePath' to '$DestinationPath'."
-    # Validate source file exists
-    if (-not (Test-Path $SourcePath)) {
-        Write-Error "Source file does not exist: $SourcePath"
+
+[OutputType([object])]
+    function Write-Log($Message, $Level = "Info", $Component = "Copy-WimFileEfficiently") {
+        if (Get-Command -Name Invoke-OSDCloudLogger -ErrorAction SilentlyContinue) {
+            Invoke-OSDCloudLogger -Message "$Message" -Level $Level -Component $Component
+        } else {
+            Write-Verbose $Message
+        }
+    }
+
+    Write-Log "Starting WIM file copy from '$SourcePath' to '$DestinationPath'."
+
+    if (-not (Test-Path "$SourcePath")) {
+        Write-Log "Source file does not exist: $SourcePath" "Error"
         return $false
     }
-    # Determine source and destination directories and file names in one go
-    $sourceDir    = Split-Path -Parent $SourcePath
-    $sourceFile   = Split-Path -Leaf $SourcePath
-    $destDir      = Split-Path -Parent $DestinationPath
-    $destFile     = Split-Path -Leaf $DestinationPath
-    Write-Verbose "Source directory: $sourceDir, File: $sourceFile"
-    Write-Verbose "Destination directory: $destDir, File: $destFile"
-    # Create destination directory if it doesn't exist (use try/catch for safety)
-    if (-not (Test-Path $destDir)) {
+
+    "$sourceDir" = Split-Path -Parent $SourcePath
+    "$sourceFile" = Split-Path -Leaf $SourcePath
+    "$destDir" = Split-Path -Parent $DestinationPath
+    "$destFile" = Split-Path -Leaf $DestinationPath
+
+    if (-not (Test-Path "$destDir")) {
         try {
-            New-Item -Path $destDir -ItemType Directory -Force | Out-Null
-            Write-Verbose "Created directory: $destDir"
+            New-Item -Path "$destDir" -ItemType Directory -Force | Out-Null
+            Write-Log "Created destination directory: $destDir"
         } catch {
-            Write-Error "Failed to create destination directory: $destDir. Error: $_"
+            Write-Log "Failed to create destination directory: $_" "Error"
             return $false
         }
     }
-    # Skip if destination file already exists and -Force is not specified
-    if ((Test-Path $DestinationPath) -and -not $Force) {
-        Write-Verbose "Destination file exists. Skipping copy (use -Force to overwrite)."
+
+    if ((Test-Path "$DestinationPath") -and (-not $Force)) {
+        Write-Log "Destination file exists. Skipping copy (use -Force to overwrite)." "Warning"
         return $true
     }
-    Write-Verbose "Using robocopy to copy file."
-    # Use Robocopy for better performance with large files
-    $robocopyArgs = @(
+
+    # Check if robocopy is available
+    if (-not (Get-Command -Name robocopy.exe -ErrorAction SilentlyContinue)) {
+        Write-Log "Robocopy is not available on this system." "Error"
+        return $false
+    }
+
+    "$robocopyArgs" = @(
         "`"$sourceDir`"",
         "`"$destDir`"",
         "`"$sourceFile`"",
-        "/J",          # Unbuffered I/O for large file optimization
-        "/NP",         # No progress – avoid screen clutter
-        "/MT:8",       # Multi-threaded copying with 8 threads
-        "/R:2",        # Retry 2 times
-        "/W:5"         # Wait 5 seconds between retries
+        "/J",
+        "/NP",
+        "/MT:$ThreadCount",
+        "/R:2",
+        "/W:5"
     )
-    $robocopyProcess = Start-Process -FilePath "robocopy.exe" -ArgumentList $robocopyArgs -NoNewWindow -Wait -PassThru
-    # Robocopy exit codes: 0-7 are success (8+ are failures)
-    if ($robocopyProcess.ExitCode -lt 8) {
-        $copiedFilePath = Join-Path $destDir $sourceFile
-        # If destination file name differs, rename the copied file
-        if ($sourceFile -ne $destFile) {
-            $finalPath = Join-Path $destDir $destFile
-            if (Test-Path $finalPath) {
-                Remove-Item -Path $finalPath -Force
-                Write-Verbose "Removed existing file at final destination: $finalPath"
+
+    Write-Log "Executing robocopy with $ThreadCount threads."
+    try {
+        $robocopy = Start-Process -FilePath "robocopy.exe" -ArgumentList $robocopyArgs -NoNewWindow -Wait -PassThru
+        if ("$robocopy".ExitCode -lt 8) {
+            "$copiedPath" = Join-Path $destDir $sourceFile
+            if ("$sourceFile" -ne $destFile) {
+                "$finalPath" = Join-Path $destDir $destFile
+                if (Test-Path "$finalPath") {
+                    Remove-Item -Path "$finalPath" -Force
+                    Write-Log "Removed existing file at $finalPath"
+                }
+                Rename-Item -Path "$copiedPath" -NewName $destFile -Force
+                Write-Log "Renamed copied file to: $destFile"
             }
-            Rename-Item -Path $copiedFilePath -NewName $destFile -Force
-            Write-Verbose "Renamed copied file to: $destFile"
+            Write-Log "WIM file copied successfully to $DestinationPath"
+            return $true
+        } else {
+            Write-Log "Robocopy failed with exit code $($robocopy.ExitCode)" "Error"
+            return $false
         }
-        Write-Verbose "WIM file copied successfully."
-        return $true
-    } else {
-        Write-Error "Failed to copy WIM file. Robocopy exit code: $($robocopyProcess.ExitCode)"
+    } catch {
+        Write-Log "Unexpected error during robocopy: $_" "Error"
         return $false
     }
 }
+Export-ModuleMember -Function Copy-WimFileEfficiently

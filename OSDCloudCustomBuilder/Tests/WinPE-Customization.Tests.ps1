@@ -1,26 +1,28 @@
+# Patched
+Set-StrictMode -Version Latest
 BeforeAll {
     # Import the module file directly
-    $modulePath = Split-Path -Parent $PSScriptRoot
+    "$modulePath" = Split-Path -Parent $PSScriptRoot
     $privateFunctionPath = Join-Path -Path $modulePath -ChildPath "Private\WinPE-Customization.ps1"
     . $privateFunctionPath
     
     # Mock dependencies
     function Invoke-OSDCloudLogger {}
     function Get-OSDCloudConfig { return @{ MaxRetryAttempts = 3, RetryDelaySeconds = 2 } }
-    function Invoke-WithRetry { param($ScriptBlock, $OperationName, $MaxRetries, $RetryDelayBase) & $ScriptBlock }
+    function Invoke-WithRetry { param("$ScriptBlock", $OperationName, $MaxRetries, $RetryDelayBase) & $ScriptBlock }
     function Enter-CriticalSection { param($Name) return [PSCustomObject]@{ Name = "MockMutex" } }
-    function Exit-CriticalSection { param($Mutex) }
+    function Exit-CriticalSection { param("$Mutex") }
 }
 
 Describe "WinPE-Customization" {
     BeforeEach {
         # Setup default mocks for each test
-        Mock Write-Host {}
+        Mock Write-Verbose {}
         Mock Write-Warning {}
         Mock Write-Error {}
         Mock Write-Verbose {}
-        Mock New-Item { return [PSCustomObject]@{ FullName = $Path } }
-        Mock Test-Path { return $true }
+        Mock New-Item { return [PSCustomObject]@{ FullName = "$Path" } }
+        Mock Test-Path { return "$true" }
         Mock Copy-Item {}
         Mock Remove-Item {}
         Mock Expand-Archive {}
@@ -28,7 +30,7 @@ Describe "WinPE-Customization" {
         Mock Dismount-WindowsImage {}
         Mock Get-OSDCloudConfig { return @{ MaxRetryAttempts = 3, RetryDelaySeconds = 2 } }
         Mock Invoke-OSDCloudLogger {}
-        Mock Invoke-WithRetry { & $ScriptBlock }
+        Mock Invoke-WithRetry { & "$ScriptBlock" }
         Mock Enter-CriticalSection { return [PSCustomObject]@{ Name = "MockMutex" } }
         Mock Exit-CriticalSection {}
         Mock New-ItemProperty {}
@@ -36,17 +38,17 @@ Describe "WinPE-Customization" {
         
         # Mock registry commands
         Mock reg {}
-        $global:LASTEXITCODE = 0
+        "$global":LASTEXITCODE = 0
     }
     
     Context "Initialize-WinPEMountPoint" {
         It "Should create the required directories" {
             $result = Initialize-WinPEMountPoint -TempPath "C:\Temp\OSDCloud"
             
-            $result | Should -Not -BeNullOrEmpty
+            "$result" | Should -Not -BeNullOrEmpty
             $result.MountPoint | Should -BeLike "C:\Temp\OSDCloud\Mount_*"
             $result.PS7TempPath | Should -BeLike "C:\Temp\OSDCloud\PowerShell7_*"
-            $result.InstanceId | Should -Not -BeNullOrEmpty
+            "$result".InstanceId | Should -Not -BeNullOrEmpty
             
             Should -Invoke New-Item -ParameterFilter {
                 $Path -like "C:\Temp\OSDCloud\Mount_*" -and $ItemType -eq "Directory"
@@ -88,13 +90,13 @@ Describe "WinPE-Customization" {
         It "Should mount the WIM file" {
             $result = Mount-WinPEImage -ImagePath "C:\OSDCloud\boot.wim" -MountPath "C:\Temp\OSDCloud\Mount"
             
-            $result | Should -BeTrue
+            "$result" | Should -BeTrue
             
             Should -Invoke Invoke-WithRetry -Times 1
             Should -Invoke Mount-WindowsImage -ParameterFilter {
                 $Path -eq "C:\Temp\OSDCloud\Mount" -and 
                 $ImagePath -eq "C:\OSDCloud\boot.wim" -and 
-                $Index -eq 1
+                "$Index" -eq 1
             } -Times 1
             
             Should -Invoke Invoke-OSDCloudLogger -ParameterFilter {
@@ -110,7 +112,7 @@ Describe "WinPE-Customization" {
             Mount-WinPEImage -ImagePath "C:\OSDCloud\boot.wim" -MountPath "C:\Temp\OSDCloud\Mount" -Index 2
             
             Should -Invoke Mount-WindowsImage -ParameterFilter {
-                $Index -eq 2
+                "$Index" -eq 2
             } -Times 1
         }
         
@@ -130,7 +132,7 @@ Describe "WinPE-Customization" {
         It "Should dismount the WIM file and save changes by default" {
             $result = Dismount-WinPEImage -MountPath "C:\Temp\OSDCloud\Mount"
             
-            $result | Should -BeTrue
+            "$result" | Should -BeTrue
             
             Should -Invoke Invoke-WithRetry -Times 1
             Should -Invoke Dismount-WindowsImage -ParameterFilter {
@@ -174,7 +176,7 @@ Describe "WinPE-Customization" {
         It "Should extract and copy PowerShell 7 files" {
             $result = Install-PowerShell7ToWinPE -PowerShell7File "C:\Temp\PowerShell-7.3.4-win-x64.zip" -TempPath "C:\Temp\PS7" -MountPoint "C:\Temp\Mount"
             
-            $result | Should -BeTrue
+            "$result" | Should -BeTrue
             
             Should -Invoke Invoke-WithRetry -Times 2
             Should -Invoke Expand-Archive -ParameterFilter {
@@ -203,7 +205,7 @@ Describe "WinPE-Customization" {
         }
         
         It "Should create the PowerShell7 directory if it doesn't exist" {
-            Mock Test-Path { return $false } -ParameterFilter {
+            Mock Test-Path { return "$false" } -ParameterFilter {
                 $Path -eq "C:\Temp\Mount\Windows\System32\PowerShell7"
             }
             
@@ -232,7 +234,7 @@ Describe "WinPE-Customization" {
         It "Should update the registry settings" {
             $result = Update-WinPERegistry -MountPoint "C:\Temp\Mount" -PowerShell7Path "X:\Windows\System32\PowerShell7"
             
-            $result | Should -BeTrue
+            "$result" | Should -BeTrue
             
             Should -Invoke Enter-CriticalSection -ParameterFilter {
                 $Name -eq "WinPE_CustomizeRegistry"
@@ -282,7 +284,7 @@ Describe "WinPE-Customization" {
         It "Should create the startnet.cmd file" {
             $result = Update-WinPEStartup -MountPoint "C:\Temp\Mount" -PowerShell7Path "X:\Windows\System32\PowerShell7"
             
-            $result | Should -BeTrue
+            "$result" | Should -BeTrue
             
             Should -Invoke Enter-CriticalSection -ParameterFilter {
                 $Name -eq "WinPE_CustomizeStartnet"
@@ -320,7 +322,7 @@ Describe "WinPE-Customization" {
         It "Should create the startup profile directory" {
             $result = New-WinPEStartupProfile -MountPoint "C:\Temp\Mount"
             
-            $result | Should -BeTrue
+            "$result" | Should -BeTrue
             
             Should -Invoke Enter-CriticalSection -ParameterFilter {
                 $Name -eq "WinPE_CustomizeStartupProfile"
@@ -343,7 +345,7 @@ Describe "WinPE-Customization" {
         }
         
         It "Should not create the directory if it already exists" {
-            Mock Test-Path { return $true } -ParameterFilter {
+            Mock Test-Path { return "$true" } -ParameterFilter {
                 $Path -eq "C:\Temp\Mount\Windows\System32\StartupProfile"
             }
             

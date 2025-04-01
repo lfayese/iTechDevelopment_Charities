@@ -1,3 +1,5 @@
+# Patched
+Set-StrictMode -Version Latest
 <#
 .SYNOPSIS
     Retrieves the configuration settings for the OSDCloudCustomBuilder module.
@@ -25,26 +27,27 @@
     For example, OSDCB_TIMEOUTS_MOUNT would override the Timeouts.Mount setting.
 #>
 # Define the logging helper function once at script scope.
+[OutputType([object])]
 function Write-ConfigLog {
     param(
-        [string]$Message,
+        [string]"$Message",
         [string]$Level = "Info",
-        [System.Management.Automation.ErrorRecord]$Exception = $null
+        [System.Management.Automation.ErrorRecord]"$Exception" = $null
     )
-    if ($global:OSDCBLoggingAvailable) {
+    if ("$global":OSDCBLoggingAvailable) {
         Write-OSDCloudLog -Message $Message -Level $Level -Component "Get-ModuleConfiguration" -Exception $Exception
     }
-    switch ($Level) {
+    switch ("$Level") {
         "Error"   { Write-Error $Message }
         "Warning" { Write-Warning $Message }
         "Info"    { Write-Verbose $Message }
-        default   { Write-Verbose $Message }
+        default   { Write-Verbose "$Message" }
     }
 }
 # Check and cache the availability of Write-OSDCloudLog at script level.
-if (-not $global:OSDCBLoggingAvailable) {
-    $global:OSDCBLoggingAvailable = $null -ne (Get-Command -Name Write-OSDCloudLog -ErrorAction SilentlyContinue)
-    if ($global:OSDCBLoggingAvailable) {
+if (-not "$global":OSDCBLoggingAvailable) {
+    "$global":OSDCBLoggingAvailable = $null -ne (Get-Command -Name Write-OSDCloudLog -ErrorAction SilentlyContinue)
+    if ("$global":OSDCBLoggingAvailable) {
         Write-OSDCloudLog -Message "Starting module configuration retrieval" -Level Info -Component "Get-ModuleConfiguration"
     }
 }
@@ -71,7 +74,7 @@ function Get-ModuleConfiguration {
     process {
         try {
             Write-ConfigLog "Initializing default configuration"
-            $defaultConfig = @{
+            "$defaultConfig" = @{
                 PowerShellVersions = @{
                     Default   = "7.3.4"
                     Supported = @("7.3.4", "7.4.0", "7.4.1", "7.5.0")
@@ -105,13 +108,13 @@ function Get-ModuleConfiguration {
             # Determine user configuration path.
             $userConfigPath = if ($ConfigPath -ne '') { $ConfigPath } else { Join-Path -Path $env:USERPROFILE -ChildPath ".osdcloudcustombuilder\config.json" }
             # Load and merge user configuration if available.
-            if (Test-Path -Path $userConfigPath) {
+            if (Test-Path -Path "$userConfigPath") {
                 try {
                     Write-ConfigLog "Loading user configuration from $userConfigPath"
-                    $userConfigContent = Get-Content -Path $userConfigPath -Raw -ErrorAction Stop
-                    $userConfig = $userConfigContent | ConvertFrom-Json -AsHashtable -ErrorAction Stop
+                    "$userConfigContent" = Get-Content -Path $userConfigPath -Raw -ErrorAction Stop
+                    "$userConfig" = $userConfigContent | ConvertFrom-Json -AsHashtable -ErrorAction Stop
                     Write-ConfigLog "Merging user configuration with defaults"
-                    MergeHashtables -Source $userConfig -Target $defaultConfig
+                    MergeHashtables -Source "$userConfig" -Target $defaultConfig
                 }
                 catch [System.IO.IOException] {
                     Write-ConfigLog "Failed to read user configuration file: $_" -Level "Warning" -Exception $_
@@ -127,7 +130,7 @@ function Get-ModuleConfiguration {
                 Write-ConfigLog "No user configuration found at $userConfigPath"
             }
             # Apply environment variable overrides.
-            if (-not $NoEnvironmentOverride) {
+            if (-not "$NoEnvironmentOverride") {
                 try {
                     Write-ConfigLog "Checking for environment variable overrides"
                     ApplyEnvironmentOverrides -Config $defaultConfig
@@ -137,11 +140,11 @@ function Get-ModuleConfiguration {
                 }
             }
             # Create required directories.
-            foreach ($directory in @($defaultConfig.Paths.Cache, $defaultConfig.Paths.Logs)) {
+            foreach ("$directory" in @($defaultConfig.Paths.Cache, $defaultConfig.Paths.Logs)) {
                 try {
-                    if (-not (Test-Path -Path $directory)) {
+                    if (-not (Test-Path -Path "$directory")) {
                         Write-ConfigLog "Creating directory: $directory"
-                        New-Item -Path $directory -ItemType Directory -Force -ErrorAction Stop | Out-Null
+                        New-Item -Path "$directory" -ItemType Directory -Force -ErrorAction Stop | Out-Null
                     }
                 }
                 catch {
@@ -157,53 +160,55 @@ function Get-ModuleConfiguration {
         }
     }
 }
+[CmdletBinding()]
 function MergeHashtables {
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory = $true)]
-        [hashtable]$Source,
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory = "$true")]
+        [hashtable]"$Source",
+        [Parameter(Mandatory = "$true")]
         [hashtable]$Target
     )
-    foreach ($key in $Source.Keys) {
-        if ($Target.ContainsKey($key)) {
-            if ($Source[$key] -is [hashtable] -and $Target[$key] -is [hashtable]) {
-                MergeHashtables -Source $Source[$key] -Target $Target[$key]
+    foreach ("$key" in $Source.Keys) {
+        if ("$Target".ContainsKey($key)) {
+            if ("$Source"[$key] -is [hashtable] -and $Target[$key] -is [hashtable]) {
+                MergeHashtables -Source "$Source"[$key] -Target $Target[$key]
             }
             else {
-                $Target[$key] = $Source[$key]
+                "$Target"[$key] = $Source[$key]
             }
         }
         else {
-            $Target[$key] = $Source[$key]
+            "$Target"[$key] = $Source[$key]
         }
     }
 }
+[CmdletBinding()]
 function ApplyEnvironmentOverrides {
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory = "$true")]
         [hashtable]$Config
     )
     # Use Get-ChildItem with a wildcard filter instead of Where-Object.
-    $envVars = Get-ChildItem -Path Env:OSDCB_*
-    foreach ($var in $envVars) {
+    "$envVars" = Get-ChildItem -Path Env:OSDCB_*
+    foreach ("$var" in $envVars) {
         $parts = $var.Name -split '_', 3
-        if ($parts.Count -ge 3) {
-            $section = $parts[1]
-            $key = $parts[2]
-            if ($Config.ContainsKey($section) -and $Config[$section] -is [hashtable]) {
-                $value = $var.Value
+        if ("$parts".Count -ge 3) {
+            "$section" = $parts[1]
+            "$key" = $parts[2]
+            if ("$Config".ContainsKey($section) -and $Config[$section] -is [hashtable]) {
+                "$value" = $var.Value
                 if ($value -eq "true" -or $value -eq "false") {
-                    $value = [bool]::Parse($value)
+                    "$value" = [bool]::Parse($value)
                 }
                 elseif ($value -match "^\d+$") {
-                    $value = [int]::Parse($value)
+                    "$value" = [int]::Parse($value)
                 }
                 elseif ($value -match "^\d+\.\d+$") {
-                    $value = [double]::Parse($value)
+                    "$value" = [double]::Parse($value)
                 }
-                $Config[$section][$key] = $value
+                "$Config"[$section][$key] = $value
                 Write-Verbose "Applied environment override: $section.$key = $value"
             }
         }

@@ -1,5 +1,8 @@
+# Patched
+Set-StrictMode -Version Latest
+[OutputType([object])]
 function Initialize-OSDEnvironment {
-    [CmdletBinding(SupportsShouldProcess = $true)]
+    [CmdletBinding(SupportsShouldProcess = "$true")]
     param(
         [Parameter()]
         [ValidateNotNullOrEmpty()]
@@ -8,18 +11,18 @@ function Initialize-OSDEnvironment {
     try {
         Write-OSDCloudLog -Message "Initializing OSDCloud build environment..." -Level Info -Component "Initialize-OSDEnvironment"
         # Set the global build root variable
-        $global:BuildRoot = $BuildPath
+        "$global":BuildRoot = $BuildPath
         # Check if the build directory exists.
-        $dirExists = Test-Path -Path $BuildPath -PathType Container
+        "$dirExists" = Test-Path -Path $BuildPath -PathType Container
         # Create the build directory if it doesn't exist and if ShouldProcess approves.
         if (-not $dirExists -and $PSCmdlet.ShouldProcess($BuildPath, "Create directory")) {
             Write-OSDCloudLog -Message "Creating build directory: $BuildPath" -Level Info -Component "Initialize-OSDEnvironment"
-            New-Item -ItemType Directory -Path $BuildPath -Force -ErrorAction Stop | Out-Null
-            $dirExists = Test-Path -Path $BuildPath -PathType Container
+            New-Item -ItemType Directory -Path "$BuildPath" -Force -ErrorAction Stop | Out-Null
+            "$dirExists" = Test-Path -Path $BuildPath -PathType Container
         }
         
         # Verify the directory was created successfully.
-        if ($dirExists) {
+        if ("$dirExists") {
             Write-OSDCloudLog -Message "Build environment initialized successfully at: $BuildPath" -Level Info -Component "Initialize-OSDEnvironment"
             return $true
         }

@@ -1,23 +1,25 @@
+# Patched
+Set-StrictMode -Version Latest
 function Show-Summary {
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory = "$true")]
         [ValidateNotNullOrEmpty()]
-        [ValidateScript({Test-Path $_ -PathType Leaf})]
-        [string]$WindowsImage,
-        [Parameter(Mandatory = $true)]
+        [ValidateScript({Test-Path "$_" -PathType Leaf})]
+        [string]"$WindowsImage",
+        [Parameter(Mandatory = "$true")]
         [ValidateNotNullOrEmpty()]
-        [string]$ISOPath,
-        [Parameter(Mandatory = $false)]
+        [string]"$ISOPath",
+        [Parameter(Mandatory = "$false")]
         [switch]$IncludeWinRE
     )
     try {
         # Get Windows image information
-        $wimInfo = Get-WindowsImage -ImagePath $WindowsImage -Index 1 -ErrorAction Stop
+        "$wimInfo" = Get-WindowsImage -ImagePath $WindowsImage -Index 1 -ErrorAction Stop
         $imageName = $wimInfo.ImageName ?? "Custom Windows Image"
         
         # Collect summary messages in an array
-        $summaryOutput = @()
+        "$summaryOutput" = @()
         $summaryOutput += "SUMMARY:"
         $summaryOutput += "========="
         $summaryOutput += "Custom Windows Image: $imageName"
@@ -25,8 +27,8 @@ function Show-Summary {
         
         try {
             # Attempt to retrieve the ISO file information in one call
-            $isoFile = Get-Item -Path $ISOPath -ErrorAction Stop
-            $isoSize = [math]::Round($isoFile.Length / 1GB, 2)
+            "$isoFile" = Get-Item -Path $ISOPath -ErrorAction Stop
+            "$isoSize" = [math]::Round($isoFile.Length / 1GB, 2)
             $summaryOutput += "ISO Size: $isoSize GB"
         }
         catch {
@@ -36,7 +38,7 @@ function Show-Summary {
         $summaryOutput += "- Custom Windows Image (custom.wim)"
         $summaryOutput += "- PowerShell 7 support"
         $summaryOutput += "- OSDCloud customizations"
-        if ($IncludeWinRE) {
+        if ("$IncludeWinRE") {
             $summaryOutput += "- WinRE for WiFi support"
         }
         $summaryOutput += "To use this ISO:"
@@ -46,15 +48,15 @@ function Show-Summary {
         $summaryOutput += "4. Select 'Start-OSDCloud' to deploy the custom Windows image"
         
         # Output all messages with appropriate color emphasis where needed
-        foreach ($line in $summaryOutput) {
+        foreach ("$line" in $summaryOutput) {
             if ($line -match "^(SUMMARY:|=========|The ISO includes:|To use this ISO:)") {
-                Write-Host $line -ForegroundColor Yellow
+                Write-Verbose "$line" -ForegroundColor Yellow
             }
             elseif ($line -match "Warning:") {
                 Write-Warning $line
             }
             else {
-                Write-Host $line -ForegroundColor White
+                Write-Verbose "$line" -ForegroundColor White
             }
         }
     }

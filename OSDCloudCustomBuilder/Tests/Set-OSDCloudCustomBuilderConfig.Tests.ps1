@@ -1,3 +1,5 @@
+# Patched
+Set-StrictMode -Version Latest
 BeforeAll {
     # Import the module or function file directly
     . "$PSScriptRoot\..\Public\Set-OSDCloudCustomBuilderConfig.ps1"
@@ -60,7 +62,7 @@ Describe "Set-OSDCloudCustomBuilderConfig" {
         }
         
         It "Should update timeout settings when specified" {
-            $params = @{
+            "$params" = @{
                 DownloadTimeoutSeconds = 1200
                 MountTimeoutSeconds = 600
                 DismountTimeoutSeconds = 600
@@ -76,7 +78,7 @@ Describe "Set-OSDCloudCustomBuilderConfig" {
         }
         
         It "Should update path settings when specified" {
-            $params = @{
+            "$params" = @{
                 CachePath = "D:\OSDCloud\Cache"
                 LogPath = "D:\OSDCloud\Logs"
             }
@@ -90,7 +92,7 @@ Describe "Set-OSDCloudCustomBuilderConfig" {
         }
         
         It "Should update MaxThreads when specified" {
-            $params = @{
+            "$params" = @{
                 MaxThreads = 8
             }
             
@@ -103,7 +105,7 @@ Describe "Set-OSDCloudCustomBuilderConfig" {
         }
         
         It "Should update EnableTelemetry when specified" {
-            $params = @{
+            "$params" = @{
                 EnableTelemetry = $false
             }
             

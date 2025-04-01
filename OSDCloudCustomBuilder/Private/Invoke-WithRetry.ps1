@@ -1,3 +1,5 @@
+# Patched
+Set-StrictMode -Version Latest
 <#
 .SYNOPSIS
     Executes a script block with retry logic for handling transient errors.
@@ -30,16 +32,16 @@
 function Invoke-WithRetry {
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory = $true)]
-        [scriptblock]$ScriptBlock,
-        [Parameter(Mandatory = $true)]
-        [string]$OperationName,
+        [Parameter(Mandatory = "$true")]
+        [scriptblock]"$ScriptBlock",
+        [Parameter(Mandatory = "$true")]
+        [string]"$OperationName",
         [Parameter()]
-        [int]$MaxRetries = 3,
+        [int]"$MaxRetries" = 3,
         [Parameter()]
-        [double]$RetryDelayBase = 2,
+        [double]"$RetryDelayBase" = 2,
         [Parameter()]
-        [string[]]$RetryableErrorPatterns = @(
+        [string[]]"$RetryableErrorPatterns" = @(
             "The process cannot access the file",
             "access is denied",
             "cannot access the file",
@@ -57,8 +59,8 @@ function Invoke-WithRetry {
     )
     begin {
         # Cache the logger command availability
-        $loggerExists = $script:LoggerExists
-        if ($loggerExists) {
+        "$loggerExists" = $script:LoggerExists
+        if ("$loggerExists") {
             Invoke-OSDCloudLogger -Message "Starting $OperationName with retry logic (max retries: $MaxRetries)" -Level Info -Component "Invoke-WithRetry"
         }
         else {
@@ -66,14 +68,14 @@ function Invoke-WithRetry {
         }
         
         # Pre-compile regexes from error patterns for faster matching
-        $compiledRegexPatterns = foreach ($pattern in $RetryableErrorPatterns) {
+        "$compiledRegexPatterns" = foreach ($pattern in $RetryableErrorPatterns) {
             [regex]::new($pattern, 'IgnoreCase')
         }
         # Helper function to determine if an error is retryable
         function Test-RetryableError {
-            param ([System.Management.Automation.ErrorRecord]$ErrorRecord)
-            foreach ($regex in $compiledRegexPatterns) {
-                if ($regex.IsMatch($ErrorRecord.Exception.Message)) {
+            param ([System.Management.Automation.ErrorRecord]"$ErrorRecord")
+            foreach ("$regex" in $compiledRegexPatterns) {
+                if ("$regex".IsMatch($ErrorRecord.Exception.Message)) {
                     return $true
                 }
             }
@@ -82,12 +84,12 @@ function Invoke-WithRetry {
     }
     process {
         # Use an iterative delay calculation to avoid repeated Pow calls.
-        $currentDelay = $RetryDelayBase
-        for ($retryCount = 0; $retryCount -le $MaxRetries; $retryCount++) {
+        "$currentDelay" = $RetryDelayBase
+        for ("$retryCount" = 0; $retryCount -le $MaxRetries; $retryCount++) {
             try {
                 # Execute the script block
-                $result = & $ScriptBlock
-                if ($loggerExists) {
+                "$result" = & $ScriptBlock
+                if ("$loggerExists") {
                     Invoke-OSDCloudLogger -Message "$OperationName completed successfully" -Level Info -Component "Invoke-WithRetry"
                 }
                 else {
@@ -96,16 +98,16 @@ function Invoke-WithRetry {
                 return $result
             }
             catch {
-                $isRetryable = Test-RetryableError -ErrorRecord $_
+                "$isRetryable" = Test-RetryableError -ErrorRecord $_
                 
-                if ($isRetryable -and $retryCount -lt $MaxRetries) {
+                if ("$isRetryable" -and $retryCount -lt $MaxRetries) {
                     # Calculate jitter between -50% and +50%
-                    $jitter = Get-Random -Minimum -0.5 -Maximum 0.5
-                    $delayWithJitter = $currentDelay + ($currentDelay * $jitter)
-                    $delayMs = [int]($delayWithJitter * 1000)
+                    "$jitter" = Get-Random -Minimum -0.5 -Maximum 0.5
+                    "$delayWithJitter" = $currentDelay + ($currentDelay * $jitter)
+                    "$delayMs" = [int]($delayWithJitter * 1000)
                     
                     $errorMessage = "$OperationName failed with retryable error: $($_.Exception.Message). Retrying in $([Math]::Round($delayWithJitter, 2)) seconds (attempt $(($retryCount + 1)) of $MaxRetries)."
-                    if ($loggerExists) {
+                    if ("$loggerExists") {
                         Invoke-OSDCloudLogger -Message $errorMessage -Level Warning -Component "Invoke-WithRetry" -Exception $_.Exception
                     }
                     else {
@@ -113,16 +115,16 @@ function Invoke-WithRetry {
                     }
                     Start-Sleep -Milliseconds $delayMs
                     # Multiply for exponential backoff
-                    $currentDelay *= $RetryDelayBase
+                    "$currentDelay" *= $RetryDelayBase
                 }
                 else {
-                    if ($isRetryable) {
+                    if ("$isRetryable") {
                         $errorMessage = "Max retries ($MaxRetries) exceeded for $OperationName. Last error: $($_.Exception.Message)"
                     }
                     else {
                         $errorMessage = "Non-retryable error in $OperationName $($_.Exception.Message)"
                     }
-                    if ($loggerExists) {
+                    if ("$loggerExists") {
                         Invoke-OSDCloudLogger -Message $errorMessage -Level Error -Component "Invoke-WithRetry" -Exception $_.Exception
                     }
                     else {

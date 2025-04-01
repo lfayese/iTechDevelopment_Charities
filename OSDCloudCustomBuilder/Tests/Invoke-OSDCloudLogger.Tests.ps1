@@ -1,6 +1,8 @@
+# Patched
+Set-StrictMode -Version Latest
 BeforeAll {
     # Import the module file directly
-    $modulePath = Split-Path -Parent $PSScriptRoot
+    "$modulePath" = Split-Path -Parent $PSScriptRoot
     $privateFunctionPath = Join-Path -Path $modulePath -ChildPath "Private\Invoke-OSDCloudLogger.ps1"
     . $privateFunctionPath
     
@@ -17,7 +19,7 @@ BeforeAll {
 Describe "Invoke-OSDCloudLogger" {
     BeforeEach {
         # Setup test environment
-        Mock Write-Host {}
+        Mock Write-Verbose {}
         Mock Write-Warning {}
         Mock Write-Error {}
         Mock Write-Debug {}
@@ -32,7 +34,7 @@ Describe "Invoke-OSDCloudLogger" {
         It "Should log an informational message" {
             Invoke-OSDCloudLogger -Message "Test info message" -Level Info -Component "TestComponent"
             
-            Should -Invoke Write-Host -ParameterFilter {
+            Should -Invoke Write-Verbose -ParameterFilter {
                 $Object -like "*Test info message*"
             } -Times 1
             
@@ -163,7 +165,7 @@ Describe "Invoke-OSDCloudLogger" {
         It "Should not write to console when NoConsole is specified" {
             Invoke-OSDCloudLogger -Message "Test message with no console" -Level Info -Component "TestComponent" -NoConsole
             
-            Should -Invoke Write-Host -Times 0
+            Should -Invoke Write-Verbose -Times 0
             Should -Invoke Add-Content -Times 1
         }
     }

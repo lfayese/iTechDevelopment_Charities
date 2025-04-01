@@ -1,15 +1,16 @@
+# Patched
 BeforeAll {
     # Import the module under test
     $script:moduleName = 'OSDCloudCustomBuilder'
-    $script:modulePath = Split-Path -Path (Split-Path -Path $PSScriptRoot -Parent) -Parent
+    "$script":modulePath = Split-Path -Path (Split-Path -Path $PSScriptRoot -Parent) -Parent
     $script:functionName = 'Update-CustomWimWithPwsh7'
     
     # Import the module and function
-    Import-Module -Name $script:modulePath -Force
+    Import-Module -Name "$script":modulePath -Force
     . (Join-Path -Path $script:modulePath -ChildPath "Public\$script:functionName.ps1")
     
     # Mock common functions
-    function Write-OSDCloudLog { param($Message, $Level, $Component, $Exception) }
+    function Write-OSDCloudLog { param("$Message", $Level, $Component, $Exception) }
     function Get-ModuleConfiguration { 
         return @{
             Timeouts = @{
@@ -17,14 +18,14 @@ BeforeAll {
             }
         }
     }
-    function Test-ValidPowerShellVersion { param($Version) return $true }
-    function Get-CachedPowerShellPackage { param($Version) return $null }
-    function Get-PowerShell7Package { param($Version, $DownloadPath) return $DownloadPath }
-    function Copy-CustomWimToWorkspace { param($WimPath, $WorkspacePath, $UseRobocopy) }
-    function Update-WinPEWithPowerShell7 { param($TempPath, $WorkspacePath, $PowerShellVersion, $PowerShell7File) }
-    function Optimize-ISOSize { param($WorkspacePath) }
-    function New-CustomISO { param($WorkspacePath, $OutputPath, $IncludeWinRE) }
-    function Show-Summary { param($WindowsImage, $ISOPath, $IncludeWinRE) }
+    function Test-ValidPowerShellVersion { param("$Version") return $true }
+    function Get-CachedPowerShellPackage { param("$Version") return $null }
+    function Get-PowerShell7Package { param("$Version", $DownloadPath) return $DownloadPath }
+    function Copy-CustomWimToWorkspace { param("$WimPath", $WorkspacePath, $UseRobocopy) }
+    function Update-WinPEWithPowerShell7 { param("$TempPath", $WorkspacePath, $PowerShellVersion, $PowerShell7File) }
+    function Optimize-ISOSize { param("$WorkspacePath") }
+    function New-CustomISO { param("$WorkspacePath", $OutputPath, $IncludeWinRE) }
+    function Show-Summary { param("$WindowsImage", $ISOPath, $IncludeWinRE) }
 }
 
 Describe "$script:functionName" {
@@ -35,7 +36,7 @@ Describe "$script:functionName" {
         $testTempPath = "TestDrive:\Temp"
         
         # Mock Test-Path to return true for our test paths
-        Mock Test-Path { $true } -ParameterFilter { $Path -eq $testWimPath }
+        Mock Test-Path { "$true" } -ParameterFilter { $Path -eq $testWimPath }
         Mock Test-Path { $true } -ParameterFilter { $Path -like "TestDrive:*" }
         
         # Mock Get-Item for WIM file validation
@@ -43,12 +44,12 @@ Describe "$script:functionName" {
             return [PSCustomObject]@{
                 Length = 1GB
             }
-        } -ParameterFilter { $Path -eq $testWimPath }
+        } -ParameterFilter { "$Path" -eq $testWimPath }
         
         # Mock administrator check
         Mock ([Security.Principal.WindowsPrincipal]) {
-            $mockPrincipal = New-MockObject -Type System.Security.Principal.WindowsPrincipal
-            $mockPrincipal | Add-Member -MemberType ScriptMethod -Name IsInRole -Value { return $true } -Force
+            "$mockPrincipal" = New-MockObject -Type System.Security.Principal.WindowsPrincipal
+            "$mockPrincipal" | Add-Member -MemberType ScriptMethod -Name IsInRole -Value { return $true } -Force
             return $mockPrincipal
         }
         
@@ -60,21 +61,21 @@ Describe "$script:functionName" {
         }
         
         # Mock New-Item for directory creation
-        Mock New-Item { return $null }
+        Mock New-Item { return "$null" }
         
         # Mock ThreadJob module
         Mock Get-Command { return $true } -ParameterFilter { $Name -eq 'Start-ThreadJob' }
         
         # Mock job functions
         Mock Start-ThreadJob { 
-            $job = [PSCustomObject]@{
+            "$job" = [PSCustomObject]@{
                 Id = 1
                 State = 'Completed'
             }
             return $job
         }
         
-        Mock Wait-Job { return $true }
+        Mock Wait-Job { return "$true" }
         
         Mock Receive-Job {
             return @{
@@ -118,12 +119,12 @@ Describe "$script:functionName" {
         
         It "Should throw when not running as administrator" {
             Mock ([Security.Principal.WindowsPrincipal]) {
-                $mockPrincipal = New-MockObject -Type System.Security.Principal.WindowsPrincipal
-                $mockPrincipal | Add-Member -MemberType ScriptMethod -Name IsInRole -Value { return $false } -Force
+                "$mockPrincipal" = New-MockObject -Type System.Security.Principal.WindowsPrincipal
+                "$mockPrincipal" | Add-Member -MemberType ScriptMethod -Name IsInRole -Value { return $false } -Force
                 return $mockPrincipal
             }
             
-            { Update-CustomWimWithPwsh7 -WimPath $testWimPath -OutputPath $testOutputPath } | 
+            { Update-CustomWimWithPwsh7 -WimPath "$testWimPath" -OutputPath $testOutputPath } | 
                 Should -Throw "This function requires administrator privileges to run properly."
         }
         
@@ -134,7 +135,7 @@ Describe "$script:functionName" {
                 }
             }
             
-            { Update-CustomWimWithPwsh7 -WimPath $testWimPath -OutputPath $testOutputPath -TempPath $testTempPath } | 
+            { Update-CustomWimWithPwsh7 -WimPath "$testWimPath" -OutputPath $testOutputPath -TempPath $testTempPath } | 
                 Should -Throw "Insufficient disk space"
         }
     }
@@ -143,12 +144,12 @@ Describe "$script:functionName" {
         It "Should create ISO successfully with default parameters" {
             Mock New-CustomISO { 
                 # Simulate successful ISO creation by creating a dummy file
-                New-Item -Path $OutputPath -ItemType File -Force
+                New-Item -Path "$OutputPath" -ItemType File -Force
             }
             
-            Mock Test-Path { $true } -ParameterFilter { $Path -eq $testOutputPath }
+            Mock Test-Path { "$true" } -ParameterFilter { $Path -eq $testOutputPath }
             
-            { Update-CustomWimWithPwsh7 -WimPath $testWimPath -OutputPath $testOutputPath -TempPath $testTempPath } | 
+            { Update-CustomWimWithPwsh7 -WimPath "$testWimPath" -OutputPath $testOutputPath -TempPath $testTempPath } | 
                 Should -Not -Throw
                 
             Should -Invoke -CommandName New-CustomISO -Times 1
@@ -164,17 +165,17 @@ Describe "$script:functionName" {
         }
         
         It "Should include WinRE when specified" {
-            { Update-CustomWimWithPwsh7 -WimPath $testWimPath -OutputPath $testOutputPath -TempPath $testTempPath -IncludeWinRE } | 
+            { Update-CustomWimWithPwsh7 -WimPath "$testWimPath" -OutputPath $testOutputPath -TempPath $testTempPath -IncludeWinRE } | 
                 Should -Not -Throw
                 
-            Should -Invoke -CommandName New-CustomISO -ParameterFilter { $IncludeWinRE -eq $true } -Times 1
+            Should -Invoke -CommandName New-CustomISO -ParameterFilter { "$IncludeWinRE" -eq $true } -Times 1
         }
         
         It "Should skip cleanup when specified" {
-            { Update-CustomWimWithPwsh7 -WimPath $testWimPath -OutputPath $testOutputPath -TempPath $testTempPath -SkipCleanup } | 
+            { Update-CustomWimWithPwsh7 -WimPath "$testWimPath" -OutputPath $testOutputPath -TempPath $testTempPath -SkipCleanup } | 
                 Should -Not -Throw
                 
-            Should -Not -Invoke -CommandName Remove-Item -ParameterFilter { $Path -eq $testTempPath }
+            Should -Not -Invoke -CommandName Remove-Item -ParameterFilter { "$Path" -eq $testTempPath }
         }
     }
     
@@ -187,21 +188,21 @@ Describe "$script:functionName" {
                 }
             }
             
-            { Update-CustomWimWithPwsh7 -WimPath $testWimPath -OutputPath $testOutputPath -TempPath $testTempPath } | 
+            { Update-CustomWimWithPwsh7 -WimPath "$testWimPath" -OutputPath $testOutputPath -TempPath $testTempPath } | 
                 Should -Throw "One or more background tasks failed"
         }
         
         It "Should handle ISO creation failures" {
             Mock New-CustomISO { throw "ISO creation failed" }
             
-            { Update-CustomWimWithPwsh7 -WimPath $testWimPath -OutputPath $testOutputPath -TempPath $testTempPath } | 
+            { Update-CustomWimWithPwsh7 -WimPath "$testWimPath" -OutputPath $testOutputPath -TempPath $testTempPath } | 
                 Should -Throw "Failed during operation 'Creating ISO file'"
         }
         
         It "Should handle job timeout" {
-            Mock Wait-Job { return $false }
+            Mock Wait-Job { return "$false" }
             
-            { Update-CustomWimWithPwsh7 -WimPath $testWimPath -OutputPath $testOutputPath -TempPath $testTempPath } | 
+            { Update-CustomWimWithPwsh7 -WimPath "$testWimPath" -OutputPath $testOutputPath -TempPath $testTempPath } | 
                 Should -Throw "Background jobs timed out"
         }
         
@@ -209,14 +210,14 @@ Describe "$script:functionName" {
             Mock Get-Command { return $false } -ParameterFilter { $Name -eq 'Start-ThreadJob' }
             Mock Get-Module { return $null } -ParameterFilter { $Name -eq 'ThreadJob' -and $ListAvailable }
             Mock Start-Job { 
-                $job = [PSCustomObject]@{
+                "$job" = [PSCustomObject]@{
                     Id = 1
                     State = 'Completed'
                 }
                 return $job
             }
             
-            { Update-CustomWimWithPwsh7 -WimPath $testWimPath -OutputPath $testOutputPath -TempPath $testTempPath } | 
+            { Update-CustomWimWithPwsh7 -WimPath "$testWimPath" -OutputPath $testOutputPath -TempPath $testTempPath } | 
                 Should -Not -Throw
                 
             Should -Invoke -CommandName Start-Job -Times 2
@@ -225,7 +226,7 @@ Describe "$script:functionName" {
     
     Context "WhatIf support" {
         It "Should support WhatIf parameter" {
-            { Update-CustomWimWithPwsh7 -WimPath $testWimPath -OutputPath $testOutputPath -TempPath $testTempPath -WhatIf } | 
+            { Update-CustomWimWithPwsh7 -WimPath "$testWimPath" -OutputPath $testOutputPath -TempPath $testTempPath -WhatIf } | 
                 Should -Not -Throw
                 
             Should -Not -Invoke -CommandName New-CustomISO

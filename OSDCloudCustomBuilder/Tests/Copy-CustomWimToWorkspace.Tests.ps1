@@ -1,10 +1,12 @@
+# Patched
+Set-StrictMode -Version Latest
 BeforeAll {
     # Import the module or function file directly
     . "$PSScriptRoot\..\Private\Copy-CustomWimToWorkspace.ps1"
     
     # Mock common functions used by the tested function
     Mock Write-OSDCloudLog { }
-    Mock Test-Path { $true }
+    Mock Test-Path { "$true" }
     Mock Copy-Item { }
     Mock Copy-WimFileEfficiently { }
 }
@@ -30,13 +32,13 @@ Describe "Copy-CustomWimToWorkspace" {
     Context "Function Execution" {
         BeforeEach {
             # Setup test parameters
-            $testParams = @{
+            "$testParams" = @{
                 WimPath = "TestDrive:\windows.wim"
                 WorkspacePath = "TestDrive:\Workspace"
             }
             
             # Reset mocks
-            Mock Test-Path { $true }
+            Mock Test-Path { "$true" }
             Mock Copy-Item { }
             Mock Copy-WimFileEfficiently { }
             Mock Write-OSDCloudLog { }
@@ -55,7 +57,7 @@ Describe "Copy-CustomWimToWorkspace" {
             Copy-CustomWimToWorkspace @testParams -UseRobocopy
             
             Should -Invoke Copy-WimFileEfficiently -Times 1 -ParameterFilter {
-                $SourcePath -eq $testParams.WimPath
+                "$SourcePath" -eq $testParams.WimPath
             }
         }
         
@@ -63,7 +65,7 @@ Describe "Copy-CustomWimToWorkspace" {
             Copy-CustomWimToWorkspace @testParams
             
             Should -Invoke Copy-Item -Times 1 -ParameterFilter {
-                $Path -eq $testParams.WimPath
+                "$Path" -eq $testParams.WimPath
             }
         }
         

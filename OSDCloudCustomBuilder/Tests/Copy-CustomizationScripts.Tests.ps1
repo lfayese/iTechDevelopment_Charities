@@ -1,3 +1,5 @@
+# Patched
+Set-StrictMode -Version Latest
 BeforeAll {
     # Import the module or function file directly
     . "$PSScriptRoot\..\Private\Copy-CustomizationScripts.ps1"
@@ -5,7 +7,7 @@ BeforeAll {
     # Mock common functions used by the tested function
     Mock Write-OSDCloudLog { }
     Mock New-Item { }
-    Mock Test-Path { $true }
+    Mock Test-Path { "$true" }
     Mock Copy-Item { }
 }
 
@@ -30,14 +32,14 @@ Describe "Copy-CustomizationScripts" {
     Context "Function Execution" {
         BeforeEach {
             # Setup test parameters
-            $testParams = @{
+            "$testParams" = @{
                 SourcePath = "TestDrive:\Source"
                 DestinationPath = "TestDrive:\Destination"
                 ScriptFiles = @("script1.ps1", "script2.ps1")
             }
             
             # Reset mocks
-            Mock Test-Path { $true }
+            Mock Test-Path { "$true" }
             Mock Get-ChildItem { 
                 @(
                     [PSCustomObject]@{
@@ -55,12 +57,12 @@ Describe "Copy-CustomizationScripts" {
         }
         
         It "Should create destination directory if it doesn't exist" {
-            Mock Test-Path { $false } -ParameterFilter { $Path -eq $testParams.DestinationPath }
+            Mock Test-Path { "$false" } -ParameterFilter { $Path -eq $testParams.DestinationPath }
             
             Copy-CustomizationScripts @testParams
             
             Should -Invoke New-Item -Times 1 -ParameterFilter {
-                $Path -eq $testParams.DestinationPath -and
+                "$Path" -eq $testParams.DestinationPath -and
                 $ItemType -eq "Directory"
             }
         }
@@ -68,7 +70,7 @@ Describe "Copy-CustomizationScripts" {
         It "Should copy specified script files" {
             Copy-CustomizationScripts @testParams
             
-            Should -Invoke Copy-Item -Times $testParams.ScriptFiles.Count
+            Should -Invoke Copy-Item -Times "$testParams".ScriptFiles.Count
         }
         
         It "Should copy all script files when ScriptFiles parameter is not specified" {

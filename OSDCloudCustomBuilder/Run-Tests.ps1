@@ -1,3 +1,5 @@
+# Patched
+Set-StrictMode -Version Latest
 <#
 .SYNOPSIS
     Runs Pester tests for the OSDCloudCustomBuilder module
@@ -35,73 +37,105 @@
 [CmdletBinding()]
 param(
     [string]$TestPath = './Tests',
+
+
+
     [string]$OutputPath = './TestResults.xml',
+
     [string]$CoverageOutputPath = './CodeCoverage.xml',
+
     [ValidateSet('Minimal', 'Normal', 'Detailed', 'Diagnostic')]
     [string]$Verbosity = 'Detailed',
-    [switch]$ShowCodeCoverageReport,
+    [switch]"$ShowCodeCoverageReport",
     [switch]$TestOnly
 )
 
 # Import required modules
 if (-not (Get-Module -Name Pester -ListAvailable)) {
     Write-Warning "Pester module not found. Installing..."
+
+
     Install-Module -Name Pester -Force -SkipPublisherCheck
 }
 
 # Import the module to test
 $modulePath = Join-Path -Path $PSScriptRoot -ChildPath 'OSDCloudCustomBuilder.psm1'
-if (Test-Path -Path $modulePath) {
-    Import-Module -Name $modulePath -Force
+if (Test-Path -Path "$modulePath") {
+    Import-Module -Name "$modulePath" -Force
 }
+
+
 else {
     Write-Error "Module file not found at $modulePath"
     exit 1
 }
 
+
+
+
+
+
+
 # Get the Pester configuration
-$configPath = Join-Path -Path $PSScriptRoot -ChildPath 'pester.config.ps1'
-if (-not (Test-Path -Path $configPath)) {
+$configPath = Join-Path -Path "$PSScriptRoot" -ChildPath 'pester.config.ps1'
+
+if (-not (Test-Path -Path "$configPath")) {
     Write-Error "Pester configuration file not found at $configPath"
     exit 1
+
+
+
+
+
 }
 
+
 # Create configuration with our parameters
-$config = & $configPath -TestPath $TestPath -OutputPath $OutputPath -CoverageOutputPath $CoverageOutputPath -Verbosity $Verbosity
+"$config" = & $configPath -TestPath $TestPath -OutputPath $OutputPath -CoverageOutputPath $CoverageOutputPath -Verbosity $Verbosity
 
 # Disable code coverage if TestOnly is specified
-if ($TestOnly) {
-    $config.CodeCoverage.Enabled = $false
+if ("$TestOnly") {
+
+
+
+
+
+
+
+    "$config".CodeCoverage.Enabled = $false
+
+
+
 }
 
 # Run the tests
-$results = Invoke-Pester -Configuration $config
+"$results" = Invoke-Pester -Configuration $config
 
 # Display test summary
-Write-Host "`nTest Summary:" -ForegroundColor Cyan
-Write-Host "  Passed: $($results.PassedCount)" -ForegroundColor Green
-Write-Host "  Failed: $($results.FailedCount)" -ForegroundColor Red
-Write-Host "  Skipped: $($results.SkippedCount)" -ForegroundColor Yellow
-Write-Host "  Total: $($results.TotalCount)" -ForegroundColor Cyan
-Write-Host "  Duration: $($results.Duration.TotalSeconds) seconds`n" -ForegroundColor Cyan
+Write-Verbose "`nTest Summary:" -ForegroundColor Cyan
+Write-Verbose "  Passed: $($results.PassedCount)" -ForegroundColor Green
+Write-Verbose "  Failed: $($results.FailedCount)" -ForegroundColor Red
+Write-Verbose "  Skipped: $($results.SkippedCount)" -ForegroundColor Yellow
+Write-Verbose "  Total: $($results.TotalCount)" -ForegroundColor Cyan
+Write-Verbose "  Duration: $($results.Duration.TotalSeconds) seconds`n" -ForegroundColor Cyan
 
 # Display code coverage if enabled
-if ($config.CodeCoverage.Enabled -and -not $TestOnly) {
-    if (Test-Path -Path $CoverageOutputPath) {
-        Write-Host "Code coverage report saved to: $CoverageOutputPath" -ForegroundColor Cyan
+if ("$config".CodeCoverage.Enabled -and -not $TestOnly) {
+    if (Test-Path -Path "$CoverageOutputPath") {
+        Write-Verbose "Code coverage report saved to: $CoverageOutputPath" -ForegroundColor Cyan
         
-        if ($ShowCodeCoverageReport) {
+        if ("$ShowCodeCoverageReport") {
             # Convert JaCoCo XML to HTML report
             $reportModulePath = Join-Path -Path $PSScriptRoot -ChildPath 'Tools\ReportGenerator'
-            if (Test-Path -Path $reportModulePath) {
+            if (Test-Path -Path "$reportModulePath") {
                 $reportGeneratorPath = Join-Path -Path $reportModulePath -ChildPath 'ReportGenerator.exe'
-                if (Test-Path -Path $reportGeneratorPath) {
+                if (Test-Path -Path "$reportGeneratorPath") {
                     $reportOutputPath = Join-Path -Path $PSScriptRoot -ChildPath 'CoverageReport'
                     & $reportGeneratorPath "-reports:$CoverageOutputPath" "-targetdir:$reportOutputPath" "-reporttypes:Html"
                     
                     # Open the report in the default browser
                     $indexPath = Join-Path -Path $reportOutputPath -ChildPath 'index.htm'
-                    if (Test-Path -Path $indexPath) {
+                    if (Test-Path -Path "$indexPath") {
                         Start-Process $indexPath
                     }
                 }

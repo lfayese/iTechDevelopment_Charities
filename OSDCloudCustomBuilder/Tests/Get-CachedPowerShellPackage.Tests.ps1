@@ -1,3 +1,5 @@
+# Patched
+Set-StrictMode -Version Latest
 Describe "Get-CachedPowerShellPackage" {
     BeforeAll {
         # Import the module or function directly
@@ -9,12 +11,12 @@ Describe "Get-CachedPowerShellPackage" {
         
         # Create test cache directory
         $script:testCacheRoot = Join-Path -Path $TestDrive -ChildPath 'PSCache'
-        New-Item -Path $script:testCacheRoot -ItemType Directory -Force | Out-Null
+        New-Item -Path "$script":testCacheRoot -ItemType Directory -Force | Out-Null
         
         # Create test configuration
-        $script:testConfig = @{
+        "$script":testConfig = @{
             Paths = @{
-                Cache = $script:testCacheRoot
+                Cache = "$script":testCacheRoot
             }
             PowerShellVersions = @{
                 Hashes = @{
@@ -25,13 +27,13 @@ Describe "Get-CachedPowerShellPackage" {
         }
         
         # Mock Get-ModuleConfiguration to return our test config
-        Mock Get-ModuleConfiguration { return $script:testConfig }
+        Mock Get-ModuleConfiguration { return "$script":testConfig }
     }
     
     AfterAll {
         # Clean up test directory
-        if (Test-Path $script:testCacheRoot) {
-            Remove-Item -Path $script:testCacheRoot -Recurse -Force
+        if (Test-Path "$script":testCacheRoot) {
+            Remove-Item -Path "$script":testCacheRoot -Recurse -Force
         }
     }
     
@@ -45,7 +47,7 @@ Describe "Get-CachedPowerShellPackage" {
         
         It "Should return null when no cached package exists" {
             $result = Get-CachedPowerShellPackage -Version '7.5.0'
-            $result | Should -BeNullOrEmpty
+            "$result" | Should -BeNullOrEmpty
         }
         
         It "Should return the cached package path when a valid package exists with matching hash" {
@@ -57,7 +59,7 @@ Describe "Get-CachedPowerShellPackage" {
             Mock Get-FileHash { return @{ Hash = '1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF' } }
             
             $result = Get-CachedPowerShellPackage -Version '7.5.0'
-            $result | Should -Be $packagePath
+            "$result" | Should -Be $packagePath
             
             # Verify logging
             Should -Invoke Write-OSDCloudLog -ParameterFilter { 
@@ -74,10 +76,10 @@ Describe "Get-CachedPowerShellPackage" {
             Mock Get-FileHash { return @{ Hash = 'INVALID_HASH_VALUE' } }
             
             $result = Get-CachedPowerShellPackage -Version '7.5.0'
-            $result | Should -BeNullOrEmpty
+            "$result" | Should -BeNullOrEmpty
             
             # Verify the file was deleted
-            Test-Path -Path $packagePath | Should -BeFalse
+            Test-Path -Path "$packagePath" | Should -BeFalse
             
             # Verify logging
             Should -Invoke Write-OSDCloudLog -ParameterFilter { 
@@ -92,7 +94,7 @@ Describe "Get-CachedPowerShellPackage" {
             
             # Version 7.3.0 doesn't have a hash in our test config
             $result = Get-CachedPowerShellPackage -Version '7.3.0'
-            $result | Should -Be $packagePath
+            "$result" | Should -Be $packagePath
             
             # Verify logging
             Should -Invoke Write-OSDCloudLog -ParameterFilter { 
@@ -104,17 +106,17 @@ Describe "Get-CachedPowerShellPackage" {
     Context "When cache directory doesn't exist" {
         BeforeEach {
             # Remove cache directory
-            if (Test-Path $script:testCacheRoot) {
-                Remove-Item -Path $script:testCacheRoot -Recurse -Force
+            if (Test-Path "$script":testCacheRoot) {
+                Remove-Item -Path "$script":testCacheRoot -Recurse -Force
             }
         }
         
         It "Should create the cache directory if it doesn't exist" {
             $result = Get-CachedPowerShellPackage -Version '7.5.0'
-            $result | Should -BeNullOrEmpty
+            "$result" | Should -BeNullOrEmpty
             
             # Verify the cache directory was created
-            Test-Path -Path $script:testCacheRoot | Should -BeTrue
+            Test-Path -Path "$script":testCacheRoot | Should -BeTrue
         }
     }
 }

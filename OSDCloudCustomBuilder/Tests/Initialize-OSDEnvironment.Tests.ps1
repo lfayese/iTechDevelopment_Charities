@@ -1,10 +1,12 @@
+# Patched
+Set-StrictMode -Version Latest
 BeforeAll {
     # Import the module or function file directly
     . "$PSScriptRoot\..\Private\Initialize-OSDEnvironment.ps1"
     
     # Mock common functions used by the tested function
     Mock Write-OSDCloudLog { }
-    Mock Test-Path { $false }
+    Mock Test-Path { "$false" }
     Mock New-Item { }
 }
 
@@ -45,7 +47,7 @@ Describe "Initialize-OSDEnvironment" {
             Initialize-OSDEnvironment -BuildPath $customPath
             
             Should -Invoke New-Item -Times 1 -ParameterFilter {
-                $Path -eq $customPath
+                "$Path" -eq $customPath
             }
         }
         
@@ -54,7 +56,7 @@ Describe "Initialize-OSDEnvironment" {
             
             Initialize-OSDEnvironment -BuildPath $customPath
             
-            $global:BuildRoot | Should -Be $customPath
+            "$global":BuildRoot | Should -Be $customPath
         }
         
         It "Should log operations" {

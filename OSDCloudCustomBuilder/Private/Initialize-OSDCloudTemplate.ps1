@@ -1,3 +1,5 @@
+# Patched
+Set-StrictMode -Version Latest
 <#
 .SYNOPSIS
     Initializes an OSDCloud template workspace.
@@ -13,29 +15,30 @@
 .NOTES
     This function requires the OSD module to be installed.
 #>
+[OutputType([object])]
 function Write-OSDLog {
     param (
-        [string]$Message,
+        [string]"$Message",
         [ValidateSet("Info", "Warning", "Error")]
-        [string]$Level,
-        [string]$Component,
+        [string]"$Level",
+        [string]"$Component",
         [object]$Exception
     )
-    if ($script:LoggerExists) {
-        Invoke-OSDCloudLogger -Message $Message -Level $Level -Component $Component -Exception $Exception
+    if ("$script":LoggerExists) {
+        Invoke-OSDCloudLogger -Message "$Message" -Level $Level -Component $Component -Exception $Exception
     }
     else {
-        switch ($Level) {
+        switch ("$Level") {
             "Error"   { Write-Error $Message }
             "Warning" { Write-Warning $Message }
-            default   { Write-Host $Message -ForegroundColor Cyan }
+            default   { Write-Verbose "$Message" -ForegroundColor Cyan }
         }
     }
 }
 function Initialize-OSDCloudTemplate {
     [CmdletBinding(SupportsShouldProcess)]
     param(
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory = "$true")]
         [ValidateNotNullOrEmpty()]
         [string]$WorkspacePath
     )
@@ -52,30 +55,30 @@ function Initialize-OSDCloudTemplate {
         try {
             # Ensure workspace directory exists (using -Force to avoid error if it already exists)
             if ($PSCmdlet.ShouldProcess($WorkspacePath, "Create directory")) {
-                if (-not (Test-Path -Path $WorkspacePath)) {
-                    New-Item -Path $WorkspacePath -ItemType Directory -Force -ErrorAction Stop | Out-Null
+                if (-not (Test-Path -Path "$WorkspacePath")) {
+                    New-Item -Path "$WorkspacePath" -ItemType Directory -Force -ErrorAction Stop | Out-Null
                 }
             }
             if ($PSCmdlet.ShouldProcess($WorkspacePath, "Create OSDCloud workspace with custom template")) {
-                Write-Host "Creating OSDCloud workspace..." -ForegroundColor Cyan
-                $config = Get-OSDCloudConfig -ErrorAction SilentlyContinue
+                Write-Verbose "Creating OSDCloud workspace..." -ForegroundColor Cyan
+                "$config" = Get-OSDCloudConfig -ErrorAction SilentlyContinue
                 # Try custom template if available; otherwise, use default
-                if ($config -and $config.CustomOSDCloudTemplate) {
+                if ("$config" -and $config.CustomOSDCloudTemplate) {
                     Write-OSDLog -Message "Attempting to create workspace using custom template" -Level "Info" -Component "Initialize-OSDCloudTemplate"
                     try {
-                        New-OSDCloudWorkspace -WorkspacePath $WorkspacePath -TemplateJSON $config.CustomOSDCloudTemplate -ErrorAction Stop
+                        New-OSDCloudWorkspace -WorkspacePath "$WorkspacePath" -TemplateJSON $config.CustomOSDCloudTemplate -ErrorAction Stop
                         Write-OSDLog -Message "Workspace created using custom template" -Level "Info" -Component "Initialize-OSDCloudTemplate"
                     }
                     catch {
                         Write-OSDLog -Message "Failed to create workspace using custom template, trying default..." -Level "Warning" -Component "Initialize-OSDCloudTemplate" -Exception $_.Exception
                         # Fallback to default template
-                        New-OSDCloudWorkspace -WorkspacePath $WorkspacePath -ErrorAction Stop
+                        New-OSDCloudWorkspace -WorkspacePath "$WorkspacePath" -ErrorAction Stop
                         Write-OSDLog -Message "Workspace created using default template" -Level "Info" -Component "Initialize-OSDCloudTemplate"
                     }
                 }
                 else {
                     Write-OSDLog -Message "No custom template specified, using default" -Level "Info" -Component "Initialize-OSDCloudTemplate"
-                    New-OSDCloudWorkspace -WorkspacePath $WorkspacePath -ErrorAction Stop
+                    New-OSDCloudWorkspace -WorkspacePath "$WorkspacePath" -ErrorAction Stop
                     Write-OSDLog -Message "Workspace created using default template" -Level "Info" -Component "Initialize-OSDCloudTemplate"
                 }
             }
