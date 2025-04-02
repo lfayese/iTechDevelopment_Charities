@@ -27,5 +27,6 @@
     "npm.enableRunFromFolder": true,
     "python.analysis.completeFunctionParens": true,
     "python.analysis.enablePerfTelemetry": true,
-    "remoteHub.gitProtocol": "ssh"
+    "remoteHub.gitProtocol": "ssh",
+    "bitoAI.codeCompletion.enableAutoCompletion": false
 }
