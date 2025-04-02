@@ -5,6 +5,7 @@
 		}
 	],
 	"settings": {
-		"CodeGPT.apiKey": "CodeGPT Plus"
+		"CodeGPT.apiKey": "CodeGPT Plus",
+		"poshProTools.signOnSaveCertificate": "Microsoft.PowerShell.Security\\Certificate::CurrentUser\\My\\4D42B429ECF03DD3E8D9C42FABD23A2D05CC6CA5"
 	}
 }

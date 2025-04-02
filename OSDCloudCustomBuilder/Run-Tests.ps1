@@ -2,156 +2,110 @@
 Set-StrictMode -Version Latest
 <#
 .SYNOPSIS
-    Runs Pester tests for the OSDCloudCustomBuilder module
+    Runs tests for the OSDCloudCustomBuilder module.
 .DESCRIPTION
-    This script runs Pester tests for the OSDCloudCustomBuilder module using the
-    configuration defined in pester.config.ps1.
-.PARAMETER TestPath
-    Path to the tests to run. Default is './Tests'.
-.PARAMETER OutputPath
-    Path for the test results output file. Default is './TestResults.xml'.
-.PARAMETER CoverageOutputPath
-    Path for the code coverage output file. Default is './CodeCoverage.xml'.
-.PARAMETER Verbosity
-    Verbosity level for the test output. Valid values are 'Minimal', 'Normal', 'Detailed', 'Diagnostic'.
-    Default is 'Detailed'.
-.PARAMETER ShowCodeCoverageReport
-    If specified, opens the code coverage report in a browser after tests complete.
-.PARAMETER TestOnly
-    If specified, runs only the tests without generating code coverage.
+    Executes Pester tests for the OSDCloudCustomBuilder module, with options for standard or specialized tests.
 .PARAMETER IncludeSpecialized
-    If specified, includes specialized tests for security, performance, error handling, and logging.
-.EXAMPLE
-    .\Run-Tests.ps1
-    Runs all tests with default settings.
-.EXAMPLE
-    .\Run-Tests.ps1 -TestPath './Tests/Unit' -Verbosity 'Minimal'
-    Runs only the unit tests with minimal output.
-.EXAMPLE
-    .\Run-Tests.ps1 -ShowCodeCoverageReport
-    Runs all tests and opens the code coverage report in a browser.
-.EXAMPLE
-    .\Run-Tests.ps1 -IncludeSpecialized
-    Runs all tests including specialized security, performance, error handling, and logging tests.
-.NOTES
-    Version: 1.0.0
-    Author: OSDCloud Team
-    Copyright: (c) 2025 OSDCloud. All rights reserved.
+    Run specialized tests in addition to standard tests.
+.PARAMETER Tags
+    Only run tests with specific tags.
+.PARAMETER CodeCoverage
+    Enable code coverage reporting.
+.PARAMETER OutputFile
+    Path to save test results.
+.PARAMETER Format
+    Format of test results (NUnitXml or JUnitXml).
 #>
-
 [CmdletBinding()]
 param(
-    [string]$TestPath = './Tests',
-    [string]$OutputPath = './TestResults.xml',
-    [string]$CoverageOutputPath = './CodeCoverage.xml',
-    [ValidateSet('Minimal', 'Normal', 'Detailed', 'Diagnostic')]
-    [string]$Verbosity = 'Detailed',
-    [switch]"$ShowCodeCoverageReport",
-    [switch]$TestOnly,
-    [switch]$IncludeSpecialized
+    [switch]$IncludeSpecialized,
+    [string[]]$Tags = @(),
+    [switch]$CodeCoverage,
+    [string]$OutputFile,
+    [ValidateSet('NUnitXml', 'JUnitXml')]
+    [string]$Format = 'NUnitXml'
 )
 
-# Include specialized tests if requested
+# Ensure we're using Pester 5.x
+$pesterModule = Get-Module -Name Pester -ListAvailable | 
+                Sort-Object -Property Version -Descending | 
+                Select-Object -First 1
+
+if (-not $pesterModule -or $pesterModule.Version.Major -lt 5) {
+    Write-Error "Pester 5.0 or higher is required. Please install using: Install-Module -Name Pester -MinimumVersion 5.0 -Force"
+    return
+}
+
+# Import Pester module
+Import-Module -Name Pester -MinimumVersion 5.0 -Force
+
+# Define the configuration
+$config = [PesterConfiguration]::Default
+$config.Run.Path = Join-Path -Path $PSScriptRoot -ChildPath "Tests\Unit"
+$config.Output.Verbosity = "Detailed"
+$config.TestResult.Enabled = $OutputFile.Length -gt 0
+
+if ($OutputFile) {
+    $config.TestResult.OutputPath = $OutputFile
+    $config.TestResult.OutputFormat = $Format
+}
+
+# Add specialized test paths if requested
 if ($IncludeSpecialized) {
-    Write-Verbose "Including specialized tests for security, performance, error handling, and logging"
     $specializedPaths = @(
-        (Join-Path -Path $PSScriptRoot -ChildPath 'Tests\Security'),
-        (Join-Path -Path $PSScriptRoot -ChildPath 'Tests\Performance'),
-        (Join-Path -Path $PSScriptRoot -ChildPath 'Tests\ErrorHandling'),
-        (Join-Path -Path $PSScriptRoot -ChildPath 'Tests\Logging')
+        (Join-Path -Path $PSScriptRoot -ChildPath "Tests\Security"),
+        (Join-Path -Path $PSScriptRoot -ChildPath "Tests\Performance"),
+        (Join-Path -Path $PSScriptRoot -ChildPath "Tests\ErrorHandling"),
+        (Join-Path -Path $PSScriptRoot -ChildPath "Tests\Integration")
     )
     
     # Filter to only include paths that exist
-    $specializedPaths = $specializedPaths | Where-Object { Test-Path -Path $_ }
+    $validSpecializedPaths = $specializedPaths | Where-Object { Test-Path -Path $_ }
     
-    if ($specializedPaths.Count -gt 0) {
-        Write-Verbose "Found $($specializedPaths.Count) specialized test paths"
-        $TestPath = @($TestPath) + $specializedPaths
-    } else {
-        Write-Warning "No specialized test paths found"
+    if ($validSpecializedPaths.Count -gt 0) {
+        $config.Run.Path = @($config.Run.Path) + $validSpecializedPaths
     }
 }
 
-# Import required modules
-if (-not (Get-Module -Name Pester -ListAvailable)) {
-    Write-Warning "Pester module not found. Installing..."
-    Install-Module -Name Pester -Force -SkipPublisherCheck
+# Configure tags if specified
+if ($Tags.Count -gt 0) {
+    $config.Filter.Tag = $Tags
 }
 
-# Import the module to test
-$modulePath = Join-Path -Path $PSScriptRoot -ChildPath 'OSDCloudCustomBuilder.psm1'
-if (Test-Path -Path "$modulePath") {
-    Import-Module -Name "$modulePath" -Force
-}
-else {
-    Write-Error "Module file not found at $modulePath"
-    exit 1
-}
-
-# Get the Pester configuration
-$configPath = Join-Path -Path "$PSScriptRoot" -ChildPath 'pester.config.ps1'
-
-if (-not (Test-Path -Path "$configPath")) {
-    Write-Error "Pester configuration file not found at $configPath"
-    exit 1
+# Configure code coverage if requested
+if ($CodeCoverage) {
+    $config.CodeCoverage.Enabled = $true
+    $config.CodeCoverage.Path = @(
+        (Join-Path -Path $PSScriptRoot -ChildPath "OSDCloudCustomBuilder.psm1"),
+        (Join-Path -Path $PSScriptRoot -ChildPath "Public\*.ps1"),
+        (Join-Path -Path $PSScriptRoot -ChildPath "Private\*.ps1")
+    )
+    $config.CodeCoverage.OutputPath = Join-Path -Path $PSScriptRoot -ChildPath "coverage.xml"
+    $config.CodeCoverage.OutputFormat = "JaCoCo"
 }
 
-# Create configuration with our parameters
-"$config" = & $configPath -TestPath $TestPath -OutputPath $OutputPath -CoverageOutputPath $CoverageOutputPath -Verbosity $Verbosity
-
-# Disable code coverage if TestOnly is specified
-if ("$TestOnly") {
-    "$config".CodeCoverage.Enabled = $false
+# Display test configuration
+Write-Host "Running tests with the following configuration:" -ForegroundColor Cyan
+Write-Host "  - Test Paths: $($config.Run.Path -join ', ')" -ForegroundColor Cyan
+if ($Tags.Count -gt 0) {
+    Write-Host "  - Tags: $($Tags -join ', ')" -ForegroundColor Cyan
+}
+Write-Host "  - Code Coverage: $($CodeCoverage)" -ForegroundColor Cyan
+if ($OutputFile) {
+    Write-Host "  - Output File: $OutputFile ($Format)" -ForegroundColor Cyan
 }
 
 # Run the tests
-"$results" = Invoke-Pester -Configuration $config
+Write-Host "`nStarting Pester tests..." -ForegroundColor Green
+$testResults = Invoke-Pester -Configuration $config -PassThru
 
-# Display test summary
-Write-Verbose "`nTest Summary:" -ForegroundColor Cyan
-Write-Verbose "  Passed: $($results.PassedCount)" -ForegroundColor Green
-Write-Verbose "  Failed: $($results.FailedCount)" -ForegroundColor Red
-Write-Verbose "  Skipped: $($results.SkippedCount)" -ForegroundColor Yellow
-Write-Verbose "  Total: $($results.TotalCount)" -ForegroundColor Cyan
-Write-Verbose "  Duration: $($results.Duration.TotalSeconds) seconds" -ForegroundColor Cyan
-if ($IncludeSpecialized) {
-    Write-Verbose "  Included specialized tests: Security, Performance, Error Handling, Logging" -ForegroundColor Cyan
-}
-Write-Verbose "" -ForegroundColor Cyan
+# Display summary
+Write-Host "`nTest Results Summary:" -ForegroundColor Cyan
+Write-Host "  - Total Tests: $($testResults.TotalCount)" -ForegroundColor White
+Write-Host "  - Passed: $($testResults.PassedCount)" -ForegroundColor Green
+Write-Host "  - Failed: $($testResults.FailedCount)" -ForegroundColor Red
+Write-Host "  - Skipped: $($testResults.SkippedCount)" -ForegroundColor Yellow
+Write-Host "  - NotRun: $($testResults.NotRunCount)" -ForegroundColor Gray
 
-# Display code coverage if enabled
-if ("$config".CodeCoverage.Enabled -and -not $TestOnly) {
-    if (Test-Path -Path "$CoverageOutputPath") {
-        Write-Verbose "Code coverage report saved to: $CoverageOutputPath" -ForegroundColor Cyan
-        
-        if ("$ShowCodeCoverageReport") {
-            # Convert JaCoCo XML to HTML report
-            $reportModulePath = Join-Path -Path $PSScriptRoot -ChildPath 'Tools\ReportGenerator'
-            if (Test-Path -Path "$reportModulePath") {
-                $reportGeneratorPath = Join-Path -Path $reportModulePath -ChildPath 'ReportGenerator.exe'
-                if (Test-Path -Path "$reportGeneratorPath") {
-                    $reportOutputPath = Join-Path -Path $PSScriptRoot -ChildPath 'CoverageReport'
-                    & $reportGeneratorPath "-reports:$CoverageOutputPath" "-targetdir:$reportOutputPath" "-reporttypes:Html"
-                    
-                    # Open the report in the default browser
-                    $indexPath = Join-Path -Path $reportOutputPath -ChildPath 'index.htm'
-                    if (Test-Path -Path "$indexPath") {
-                        Start-Process $indexPath
-                    }
-                }
-                else {
-                    Write-Warning "ReportGenerator not found. Install it to view HTML coverage reports."
-                }
-            }
-            else {
-                Write-Warning "ReportGenerator module not found. Install it to view HTML coverage reports."
-            }
-        }
-    }
-    else {
-        Write-Warning "Code coverage report not found at $CoverageOutputPath"
-    }
-}
-
-# Return the results for use in scripts
-return $results
+# Return test results in case this script is called from another script
+return $testResults
