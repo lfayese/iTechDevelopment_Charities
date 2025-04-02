@@ -56,15 +56,18 @@ RUN pwsh -Command " \
     Install-Module -Name PSModuleDevelopment -Force; \
     # Install ImportExcel for Excel integration \
     Install-Module -Name ImportExcel -Force; \
+    # Install PowerShell Pro Tools module \
+    Install-Module -Name PowerShellProTools -Force; \
     # Install OSD Module for OS deployment utilities \
     Install-Module -Name OSD -Force"
 
-# Install Bito AI and ChatGPT tools
+# Install Bito AI, ChatGPT tools, and GitHub Copilot
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     && apt-get -y install --no-install-recommends \
     python3-openai \
     && npm install -g bito-cli @bitoai/bito \
     && npm install -g chatgpt-cli openai-cli gpt-cli \
+    && npm install -g @githubnext/github-copilot-cli \
     && pip3 install openai chatgpt-wrapper
 
 # Install TabNine AI
@@ -126,7 +129,16 @@ else\n\
     # Otherwise, just run bito with any arguments passed\n\
     bito "$@"\n\
 fi' > /usr/local/bin/ai-helper \
-    && chmod +x /usr/local/bin/ai-helper
+    && chmod +x /usr/local/bin/ai-helper \
+    && echo '#!/bin/bash\n\
+if [ -p /dev/stdin ]; then\n\
+    # If we have something on stdin, use it\n\
+    cat | github-copilot-cli "$@"\n\
+else\n\
+    # Otherwise, just run github-copilot with any arguments passed\n\
+    github-copilot-cli "$@"\n\
+fi' > /usr/local/bin/copilot-helper \
+    && chmod +x /usr/local/bin/copilot-helper
 
 # Create TabNine helper for terminal use
 RUN echo '#!/bin/bash\n\
