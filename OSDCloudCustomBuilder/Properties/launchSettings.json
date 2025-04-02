@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "OSDCLoudCustomBuilder": {
+      "commandName": "Project",
+      "nativeDebugging": true
+    }
+  }
+}

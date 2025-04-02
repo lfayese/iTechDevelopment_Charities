@@ -21,6 +21,22 @@ OSDCloudCustomBuilder enables you to:
 
 ### Installing the Module
 
+#### Option 1: Install from Local Repository
+
+```powershell
+# Clone or download the repository to a local folder
+# Navigate to the repository root folder
+
+# Import directly from the local path
+Import-Module -Path ".\OSDCloudCustomBuilder.psd1"
+
+# Alternatively, for development/testing:
+# Import with force to refresh any changes
+Import-Module -Path ".\OSDCloudCustomBuilder.psd1" -Force
+```
+
+#### Option 2: Install from PowerShell Gallery
+
 ```powershell
 # Install from PowerShell Gallery
 Install-Module OSDCloudCustomBuilder -Force
