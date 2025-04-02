@@ -19,6 +19,8 @@ Set-StrictMode -Version Latest
     If specified, opens the code coverage report in a browser after tests complete.
 .PARAMETER TestOnly
     If specified, runs only the tests without generating code coverage.
+.PARAMETER IncludeSpecialized
+    If specified, includes specialized tests for security, performance, error handling, and logging.
 .EXAMPLE
     .\Run-Tests.ps1
     Runs all tests with default settings.
@@ -28,6 +30,9 @@ Set-StrictMode -Version Latest
 .EXAMPLE
     .\Run-Tests.ps1 -ShowCodeCoverageReport
     Runs all tests and opens the code coverage report in a browser.
+.EXAMPLE
+    .\Run-Tests.ps1 -IncludeSpecialized
+    Runs all tests including specialized security, performance, error handling, and logging tests.
 .NOTES
     Version: 1.0.0
     Author: OSDCloud Team
@@ -37,24 +42,39 @@ Set-StrictMode -Version Latest
 [CmdletBinding()]
 param(
     [string]$TestPath = './Tests',
-
-
-
     [string]$OutputPath = './TestResults.xml',
-
     [string]$CoverageOutputPath = './CodeCoverage.xml',
-
     [ValidateSet('Minimal', 'Normal', 'Detailed', 'Diagnostic')]
     [string]$Verbosity = 'Detailed',
     [switch]"$ShowCodeCoverageReport",
-    [switch]$TestOnly
+    [switch]$TestOnly,
+    [switch]$IncludeSpecialized
 )
+
+# Include specialized tests if requested
+if ($IncludeSpecialized) {
+    Write-Verbose "Including specialized tests for security, performance, error handling, and logging"
+    $specializedPaths = @(
+        (Join-Path -Path $PSScriptRoot -ChildPath 'Tests\Security'),
+        (Join-Path -Path $PSScriptRoot -ChildPath 'Tests\Performance'),
+        (Join-Path -Path $PSScriptRoot -ChildPath 'Tests\ErrorHandling'),
+        (Join-Path -Path $PSScriptRoot -ChildPath 'Tests\Logging')
+    )
+    
+    # Filter to only include paths that exist
+    $specializedPaths = $specializedPaths | Where-Object { Test-Path -Path $_ }
+    
+    if ($specializedPaths.Count -gt 0) {
+        Write-Verbose "Found $($specializedPaths.Count) specialized test paths"
+        $TestPath = @($TestPath) + $specializedPaths
+    } else {
+        Write-Warning "No specialized test paths found"
+    }
+}
 
 # Import required modules
 if (-not (Get-Module -Name Pester -ListAvailable)) {
     Write-Warning "Pester module not found. Installing..."
-
-
     Install-Module -Name Pester -Force -SkipPublisherCheck
 }
 
@@ -63,18 +83,10 @@ $modulePath = Join-Path -Path $PSScriptRoot -ChildPath 'OSDCloudCustomBuilder.ps
 if (Test-Path -Path "$modulePath") {
     Import-Module -Name "$modulePath" -Force
 }
-
-
 else {
     Write-Error "Module file not found at $modulePath"
     exit 1
 }
-
-
-
-
-
-
 
 # Get the Pester configuration
 $configPath = Join-Path -Path "$PSScriptRoot" -ChildPath 'pester.config.ps1'
@@ -82,30 +94,14 @@ $configPath = Join-Path -Path "$PSScriptRoot" -ChildPath 'pester.config.ps1'
 if (-not (Test-Path -Path "$configPath")) {
     Write-Error "Pester configuration file not found at $configPath"
     exit 1
-
-
-
-
-
 }
-
 
 # Create configuration with our parameters
 "$config" = & $configPath -TestPath $TestPath -OutputPath $OutputPath -CoverageOutputPath $CoverageOutputPath -Verbosity $Verbosity
 
 # Disable code coverage if TestOnly is specified
 if ("$TestOnly") {
-
-
-
-
-
-
-
     "$config".CodeCoverage.Enabled = $false
-
-
-
 }
 
 # Run the tests
@@ -117,7 +113,11 @@ Write-Verbose "  Passed: $($results.PassedCount)" -ForegroundColor Green
 Write-Verbose "  Failed: $($results.FailedCount)" -ForegroundColor Red
 Write-Verbose "  Skipped: $($results.SkippedCount)" -ForegroundColor Yellow
 Write-Verbose "  Total: $($results.TotalCount)" -ForegroundColor Cyan
-Write-Verbose "  Duration: $($results.Duration.TotalSeconds) seconds`n" -ForegroundColor Cyan
+Write-Verbose "  Duration: $($results.Duration.TotalSeconds) seconds" -ForegroundColor Cyan
+if ($IncludeSpecialized) {
+    Write-Verbose "  Included specialized tests: Security, Performance, Error Handling, Logging" -ForegroundColor Cyan
+}
+Write-Verbose "" -ForegroundColor Cyan
 
 # Display code coverage if enabled
 if ("$config".CodeCoverage.Enabled -and -not $TestOnly) {
