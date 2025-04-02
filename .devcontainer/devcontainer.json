@@ -1,0 +1,60 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/ubuntu
+{
+	"name": "Ubuntu",
+	"image": "mcr.microsoft.com/devcontainers/base:jammy",
+	"features": {
+		"ghcr.io/devcontainers/features/git:1": {},
+		"ghcr.io/devcontainers/features/git-lfs:1": {},
+		"ghcr.io/devcontainers/features/github-cli:1": {},
+		"ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {},
+		"ghcr.io/devcontainers/features/powershell:1": {},
+		"ghcr.io/devcontainers/features/terraform:1": {},
+		"ghcr.io/nikiforovall/devcontainer-features/dotnet-csharpier:1": {},
+		"ghcr.io/devcontainers-contrib/features/pulumi:1": {},
+		"ghcr.io/devcontainers-contrib/features/ansible:2.0.17": {},
+		"ghcr.io/devcontainers-contrib/features/act:1": {},
+		"ghcr.io/devcontainers-contrib/features/yamllint:2": {}
+	},
+
+	// Mount parent directories to /workspaces :2.0.17.0.17.0.17.0.17th cached consistency
+	"mounts": [
+		"source=../../,target=/workspaces,type=bind,consistency=cached"
+	],
+
+	// Set network mode to connect to the db service
+	"runArgs": ["--network=service:db"],
+
+	// Use 'forwardPorts' to make a list of ports inside the container available locally.
+	// "forwardPorts": [],
+
+	// Use 'postCreateCommand' to run commands after the container is created.
+	"postCreateCommand": "pwsh -Command \"Set-PSRepository -Name PSGallery -InstallationPolicy Trusted; Install-Module -Name PSScriptAnalyzer, Pester, platyPS, Az -Force\" && curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash && kubectl krew install kustomize && npm install -g firebase-tools vercel netlify-cli serverless && pip install --user ansible && echo 'This dev container includes the GitHub CLI (gh), which is pre-installed and available on the PATH. IMPORTANT: gh api -f does not support object values, use multiple -f flags with hierarchical keys and string values instead. When using GitHub actions actions/upload-artifact or actions/download-artifact use v4 or later.'",
+
+	// Configure tool-specific properties.
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-azuretools.vscode-azurefunctions",
+				"ms-azuretools.vscode-azureresourcegroups",
+				"ms-azuretools.vscode-cosmosdb",
+				"amazonwebservices.aws-toolkit-vscode",
+				"GoogleCloudTools.cloudcode",
+				"pulumi.pulumi-lsp-client",
+				"netlify.netlify",
+				"timonwong.shellcheck",
+				"sonarsource.sonarlint-vscode"
+			],
+			"settings": {
+				"yaml.schemas": {
+					"kubernetes": "*.yaml",
+					"https://json.schemastore.org/github-workflow.json": ".github/workflows/*.yml"
+				},
+				"github-actions.workflows.pinned.workflows": [".github/workflows/*.yml"]
+			}
+		}
+	}
+
+	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
+	// "remoteUser": "root"
+}
